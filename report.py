@@ -2,8 +2,8 @@ import argparse
 import json
 import os
 
+import matplotlib.patheffects as path_effects
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 from tqdm import tqdm
@@ -115,13 +115,13 @@ class MusicCollectionAnalyzer:
         """Revert to original tempo/danceability plots"""
         fig, axs = plt.subplots(1, 2, figsize=(18, 8))
 
-        # Tempo plot (original version)
+        # Tempo plot
         sns.histplot(self.df["tempo"], bins=50, ax=axs[0], kde=True)
         axs[0].set_title("Tempo Distribution")
         axs[0].set_xlabel("BPM")
         axs[0].set_xlim(60, 180)
 
-        # Danceability plot (original violin version)
+        # Danceability plot
         sns.violinplot(y=self.df["danceability"], ax=axs[1], inner="quartile")
         axs[0].set_ylabel("Count")
         axs[1].set_title("Danceability Distribution")
@@ -219,7 +219,7 @@ class MusicCollectionAnalyzer:
         plt.savefig(os.path.join(self.output_dir, "emotion_space_joint.png"))
         plt.close()
 
-        # New version with quadrant labels
+        # another plot with quadrant labels
         plt.figure(figsize=(12, 10))
         hexbin = plt.hexbin(
             self.df["valence"],
@@ -242,6 +242,7 @@ class MusicCollectionAnalyzer:
             va="center",
             transform=plt.gca().transAxes,
             color="white",
+            path_effects=[path_effects.withStroke(linewidth=3, foreground="black")],
         )
         plt.text(
             0.2,
@@ -250,7 +251,7 @@ class MusicCollectionAnalyzer:
             ha="center",
             va="center",
             transform=plt.gca().transAxes,
-            color="white",
+            color="black",
         )
         plt.text(
             0.8,
@@ -276,20 +277,42 @@ class MusicCollectionAnalyzer:
         return self
 
     def analyze_vocal_instrumental(self):
-        """Keep original vocal/instrumental plot"""
+        """Enhanced vocal/instrumental visualizations"""
         vocal_mean = self.df["voice_instrumental"].apply(lambda x: x["voice"]).mean()
 
-        plt.figure()
+        # Donut Chart
+        plt.figure(figsize=(10, 10))
         plt.pie(
             [vocal_mean, 1 - vocal_mean],
             labels=["Vocal", "Instrumental"],
-            autopct="%1.1f%%",
+            colors=["#FF6B6B", "#4ECDC4"],
             startangle=90,
+            wedgeprops={"linewidth": 4, "edgecolor": "white"},
+            textprops={"fontsize": 14},
         )
-        plt.title("Vocal vs Instrumental Distribution")
+
+        # Draw center circle for donut effect
+        centre_circle = plt.Circle((0, 0), 0.70, fc="white")
+        plt.gca().add_artist(centre_circle)
+
+        # Add percentage text with shadow
+        plt.text(
+            0,
+            0,
+            f"{vocal_mean:.1%} Vocal\nTracks",
+            ha="center",
+            va="center",
+            fontsize=24,
+            fontweight="bold",
+            color="#2d3436",
+            path_effects=[path_effects.withStroke(linewidth=3, foreground="white")],
+        )
+
+        plt.title("Vocal Presence in Collection", fontsize=18, pad=20)
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "vocal_instrumental.png"))
+        plt.savefig(os.path.join(self.output_dir, "vocal_instrumental_donut.png"))
         plt.close()
+
         return self
 
     def generate_report(self):
