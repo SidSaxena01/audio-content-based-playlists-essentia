@@ -1,0 +1,22 @@
+[project]
+name = "essentia-playlists"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "essentia>=2.1b6.dev1177",
+    "essentia-tensorflow>=2.1b6.dev1177",
+    "matplotlib>=3.10.0",
+    "numpy<2.0",
+    "pandas>=2.2.3",
+    "seaborn>=0.13.2",
+    "tensorflow-macos>=2.16.2",
+    "tensorflow-metal>=1.2.0",
+    "tqdm>=4.67.1",
+]
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+]
