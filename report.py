@@ -1,23 +1,27 @@
 import argparse
 import json
 import os
-import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from matplotlib.cm import get_cmap
 from tqdm import tqdm
 
-# plt.style.available
-# ['Solarize_Light2', '_classic_test_patch', '_mpl-gallery', '_mpl-gallery-nogrid', 'bmh', 'classic', 'dark_background', 'fast', 'fivethirtyeight', 'ggplot', 'grayscale', 'petroff10', 'seaborn-v0_8', 'seaborn-v0_8-bright', 'seaborn-v0_8-colorblind', 'seaborn-v0_8-dark', 'seaborn-v0_8-dark-palette', 'seaborn-v0_8-darkgrid', 'seaborn-v0_8-deep', 'seaborn-v0_8-muted', 'seaborn-v0_8-notebook', 'seaborn-v0_8-paper', 'seaborn-v0_8-pastel', 'seaborn-v0_8-poster', 'seaborn-v0_8-talk', 'seaborn-v0_8-ticks', 'seaborn-v0_8-white', 'seaborn-v0_8-whitegrid', 'tableau-colorblind10']
-
-# Configure plotting style
+# Global plot settings
 plt.style.use("seaborn-v0_8-deep")
 sns.set_palette("husl")
-plt.rcParams["figure.figsize"] = (12, 8)
-plt.rcParams["font.size"] = 12
+plt.rcParams.update(
+    {
+        "figure.figsize": (12, 8),
+        "font.size": 12,
+        "axes.titlesize": 16,
+        "axes.labelsize": 14,
+        "xtick.labelsize": 12,
+        "ytick.labelsize": 12,
+        "legend.fontsize": 12,
+    }
+)
 
 
 class MusicCollectionAnalyzer:
@@ -28,7 +32,7 @@ class MusicCollectionAnalyzer:
         os.makedirs(output_dir, exist_ok=True)
 
     def load_data(self):
-        """Load all JSON analysis files into a DataFrame"""
+        """Load analysis files with error handling"""
         json_files = []
         for root, _, files in os.walk(self.analysis_dir):
             for f in files:
@@ -36,168 +40,166 @@ class MusicCollectionAnalyzer:
                     json_files.append(os.path.join(root, f))
 
         data = []
-        for json_file in tqdm(json_files, desc="Loading analysis files"):
-            with open(json_file) as f:
-                entry = json.load(f)
-                entry["path"] = os.path.relpath(json_file, self.analysis_dir)
-                data.append(entry)
+        for json_file in tqdm(json_files, desc="Loading files"):
+            try:
+                with open(json_file) as f:
+                    entry = json.load(f)
+                    entry["path"] = os.path.relpath(json_file, self.analysis_dir)
+                    data.append(entry)
+            except Exception as e:
+                print(f"Skipping {json_file}: {str(e)}")
 
         self.df = pd.DataFrame(data)
         return self
 
+    def _process_genres(self, genres):
+        """Process genre entries with proper separator handling"""
+        processed = []
+        for genre_entry in genres:
+            genre_str = genre_entry["genre"]
+            prob = genre_entry["probability"]
+
+            if "---" in genre_str:
+                parts = genre_str.split("---", 1)
+            elif "—" in genre_str:
+                parts = genre_str.split("—", 1)
+            else:
+                parts = [genre_str, "unknown-style"]
+
+            parent = parts[0].strip()
+            style = parts[1].strip() if len(parts) > 1 else "unknown-style"
+
+            processed.append({"parent": parent, "style": style, "probability": prob})
+        return processed
+
     def preprocess_data(self):
-        """Preprocess data for analysis"""
+        """Prepare data for analysis"""
+        self.df["genres_processed"] = self.df["music_styles"].apply(
+            self._process_genres
+        )
 
-        # Process genres
-        def process_genres(genres):
-            processed = []
-            for genre_entry in genres:
-                genre_str = genre_entry["genre"]
-                prob = genre_entry["probability"]
-
-                # Handle different separator variants
-                if "---" in genre_str:  # Use triple hyphen as separator
-                    parent, style = genre_str.split("---", 1)
-                elif "—" in genre_str:  # em-dash fallback
-                    parent, style = genre_str.split("—", 1)
-                else:
-                    parent = genre_str
-                    style = "unknown-style"
-
-                processed.append(
-                    {
-                        "parent": parent.strip(),
-                        "style": style.strip(),
-                        "probability": prob,
-                    }
-                )
-            return processed
-
-        # Process keys with type checking
+        # Process keys
         key_profiles = ["temperley", "krumhansl", "edma"]
         for profile in key_profiles:
             self.df[f"key_{profile}"] = self.df["key"].apply(
                 lambda x: f"{x[profile]['key']} {x[profile]['scale'].capitalize()}"
-                if isinstance(x, dict)
-                else "unknown"
             )
 
-        # Apply safe genre processing
-        self.df["genres_processed"] = self.df["music_styles"].apply(process_genres)
         return self
 
     def analyze_styles(self):
-        """Safe style analysis with data validation"""
-        try:
-            # Extract styles with fallback
-            style_data = []
-            for track in self.df.genres_processed:
-                for genre in track:
-                    # Now properly split styles with correct separator
-                    style_data.append(genre["style"])
+        """Parent genre distribution (keep original)"""
+        parent_data = []
+        for track in self.df.genres_processed:
+            total = sum(g["probability"] for g in track)
+            for genre in track:
+                parent_data.append(
+                    {"parent": genre["parent"], "weight": genre["probability"] / total}
+                )
 
-            style_counts = pd.Series(style_data).value_counts().reset_index()
-            style_counts.columns = ["Style", "Count"]
-            style_counts.to_csv(
-                os.path.join(self.output_dir, "style_distribution.tsv"),
-                sep="\t",
-                index=False,
-            )
+        parent_df = pd.DataFrame(parent_data)
+        top_parents = parent_df.groupby("parent")["weight"].sum().nlargest(20)
 
-            # Parent genre analysis with weighting
-            parent_data = []
-            for track in self.df.genres_processed:
-                total_prob = sum(g["probability"] for g in track)
-                for genre in track:
-                    parent_data.append(
-                        {
-                            "parent": genre["parent"],
-                            "weight": genre["probability"] / total_prob,
-                        }
-                    )
-
-            parent_df = pd.DataFrame(parent_data)
-            top_parents = parent_df.groupby("parent")["weight"].sum().nlargest(20)
-
-            # Plot parent genre distribution
-            plt.figure()
-            top_parents.sort_values().plot(kind="barh")
-            plt.title("Top 20 Parent Genre Distribution")
-            plt.xlabel("Weighted Count")
-            plt.ylabel("Parent Genre")
-            plt.tight_layout()
-            plt.savefig(os.path.join(self.output_dir, "parent_genre_distribution.png"))
-            plt.close()
-
-        except Exception as e:
-            print(f"Style analysis error: {str(e)}")
-            raise
+        plt.figure()
+        top_parents.sort_values().plot(kind="barh")
+        plt.title("Top 20 Parent Genre Distribution")
+        plt.xlabel("Weighted Proportion")
+        plt.ylabel("Genre Category")
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, "parent_genre_distribution.png"))
+        plt.close()
 
         return self
 
     def analyze_tempo_danceability(self):
-        """Analyze tempo and danceability distributions"""
+        """Revert to original tempo/danceability plots"""
         fig, axs = plt.subplots(1, 2, figsize=(18, 8))
 
-        # Tempo histogram
+        # Tempo plot (original version)
         sns.histplot(self.df["tempo"], bins=50, ax=axs[0], kde=True)
         axs[0].set_title("Tempo Distribution")
         axs[0].set_xlabel("BPM")
         axs[0].set_xlim(60, 180)
 
-        # Danceability boxplot
+        # Danceability plot (original violin version)
         sns.violinplot(y=self.df["danceability"], ax=axs[1], inner="quartile")
+        axs[0].set_ylabel("Count")
         axs[1].set_title("Danceability Distribution")
         axs[1].set_ylabel("Danceability Score")
 
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "tempo_danceability.png"))
         plt.close()
-
         return self
 
     def analyze_keys(self):
-        """Analyze key and scale distributions"""
-        key_profiles = ["temperley", "krumhansl", "edma"]
-        fig, axs = plt.subplots(1, 3, figsize=(20, 8))
+        """Keep improved key comparison plot"""
+        # Create comparison DataFrame
+        key_data = []
+        profiles = ["temperley", "krumhansl", "edma"]
+        for profile in profiles:
+            counts = self.df[f"key_{profile}"].value_counts().reset_index()
+            counts.columns = ["Key", "Count"]
+            counts["Profile"] = profile.capitalize()
+            key_data.append(counts)
 
-        # Key agreement calculation
-        self.df["key_match"] = (
-            self.df[[f"key_{p}" for p in key_profiles]].nunique(axis=1) == 1
+        key_df = pd.concat(key_data)
+
+        # Musical key order
+        key_order = [
+            "C Major",
+            "C Minor",
+            "C# Major",
+            "C# Minor",
+            "D Major",
+            "D Minor",
+            "Eb Major",
+            "Eb Minor",
+            "E Major",
+            "E Minor",
+            "F Major",
+            "F Minor",
+            "F# Major",
+            "F# Minor",
+            "G Major",
+            "G Minor",
+            "Ab Major",
+            "Ab Minor",
+            "A Major",
+            "A Minor",
+            "Bb Major",
+            "Bb Minor",
+            "B Major",
+            "B Minor",
+        ]
+
+        # Plot comparison
+        plt.figure(figsize=(18, 8))
+        sns.barplot(
+            x="Key",
+            y="Count",
+            hue="Profile",
+            data=key_df,
+            order=key_order,
+            palette="Set2",
         )
-        agreement_rate = self.df["key_match"].mean()
-
-        # Plot key distributions
-        for i, profile in enumerate(key_profiles):
-            key_counts = self.df[f"key_{profile}"].value_counts().sort_index()
-            key_order = sorted(
-                key_counts.index, key=lambda x: (x.split()[0], x.split()[1])
-            )
-
-            sns.barplot(
-                x=key_counts.values, y=key_counts.index, order=key_order, ax=axs[i]
-            )
-            axs[i].set_title(f"Key Distribution ({profile.capitalize()})")
-            axs[i].set_xlabel("Count")
-            axs[i].set_ylabel("")
-
+        plt.title("Key Distribution Comparison")
+        plt.xlabel("Musical Key")
+        plt.ylabel("Number of Tracks")
+        plt.xticks(rotation=45, ha="right")
+        plt.legend(title="Estimation Method")
+        plt.grid(True, axis="y", alpha=0.3)
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "key_distributions.png"))
+        plt.savefig(os.path.join(self.output_dir, "key_comparison.png"))
         plt.close()
-
-        print(f"Key agreement rate between all profiles: {agreement_rate:.1%}")
         return self
 
     def analyze_loudness(self):
-        """Analyze loudness distribution"""
+        """Keep original loudness plot"""
         plt.figure()
         sns.histplot(self.df["loudness"], bins=30, kde=True)
-        plt.axvline(
-            -14, color="r", linestyle="--", label="Standard Music Reference (-14 LUFS)"
-        )
-        plt.axvline(
-            -23, color="g", linestyle="--", label="Broadcast Standard (-23 LUFS)"
-        )
+        plt.axvline(-14, color="r", linestyle="--", label="-14 LUFS (Music)")
+        plt.axvline(-23, color="g", linestyle="--", label="-23 LUFS (Broadcast)")
         plt.title("Integrated Loudness Distribution")
         plt.xlabel("LUFS")
         plt.legend()
@@ -206,39 +208,99 @@ class MusicCollectionAnalyzer:
         return self
 
     def analyze_emotion(self):
-        """Analyze valence-arousal emotion space"""
+        """Generate both emotion plots"""
+        # Original joint plot
         plt.figure()
         sns.jointplot(
             x=self.df["valence"], y=self.df["arousal"], kind="hex", cmap="viridis"
         )
         plt.suptitle("Valence-Arousal Emotion Space")
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "emotion_space.png"))
+        plt.savefig(os.path.join(self.output_dir, "emotion_space_joint.png"))
+        plt.close()
+
+        # New version with quadrant labels
+        plt.figure(figsize=(12, 10))
+        hexbin = plt.hexbin(
+            self.df["valence"],
+            self.df["arousal"],
+            gridsize=25,
+            cmap="viridis",
+            mincnt=1,
+        )
+        plt.colorbar(hexbin, label="Track Density")
+        plt.title("Musical Emotion Landscape")
+        plt.xlabel("Valence (Positive ↔ Negative)")
+        plt.ylabel("Arousal (Calm ↔ Energetic)")
+
+        # Quadrant labels
+        plt.text(
+            0.8,
+            0.9,
+            "Exciting\nPositive",
+            ha="center",
+            va="center",
+            transform=plt.gca().transAxes,
+            color="white",
+        )
+        plt.text(
+            0.2,
+            0.9,
+            "Stressful\nNegative",
+            ha="center",
+            va="center",
+            transform=plt.gca().transAxes,
+            color="white",
+        )
+        plt.text(
+            0.8,
+            0.1,
+            "Content\nCalm",
+            ha="center",
+            va="center",
+            transform=plt.gca().transAxes,
+        )
+        plt.text(
+            0.2,
+            0.1,
+            "Depressing\nSad",
+            ha="center",
+            va="center",
+            transform=plt.gca().transAxes,
+        )
+
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, "emotion_space_quadrants.png"))
         plt.close()
         return self
 
     def analyze_vocal_instrumental(self):
-        """Analyze vocal vs instrumental distribution"""
-        vocal_ratio = self.df["voice_instrumental"].apply(lambda x: x["voice"]).mean()
+        """Keep original vocal/instrumental plot"""
+        vocal_mean = self.df["voice_instrumental"].apply(lambda x: x["voice"]).mean()
 
         plt.figure()
         plt.pie(
-            [vocal_ratio, 1 - vocal_ratio],
+            [vocal_mean, 1 - vocal_mean],
             labels=["Vocal", "Instrumental"],
             autopct="%1.1f%%",
             startangle=90,
         )
         plt.title("Vocal vs Instrumental Distribution")
+        plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "vocal_instrumental.png"))
         plt.close()
         return self
 
     def generate_report(self):
-        """Generate full analysis report"""
+        """Generate complete report"""
         self.load_data()
+        if self.df.empty:
+            raise ValueError("No valid analysis files found")
+
         self.preprocess_data()
 
-        print("Starting analysis...")
+        print("Generating analysis report...")
         (
             self.analyze_styles()
             .analyze_tempo_danceability()
@@ -248,20 +310,18 @@ class MusicCollectionAnalyzer:
             .analyze_vocal_instrumental()
         )
 
-        print(f"Analysis complete! Results saved to {self.output_dir}")
+        print(f"Report successfully generated in {self.output_dir}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate music collection report")
     parser.add_argument("analysis_dir", help="Directory with JSON analysis files")
-    parser.add_argument("output_dir", help="Directory to save report results")
-
+    parser.add_argument("output_dir", help="Output directory for report")
     args = parser.parse_args()
 
     analyzer = MusicCollectionAnalyzer(args.analysis_dir, args.output_dir)
-
     try:
         analyzer.generate_report()
     except Exception as e:
-        print(f"Critical error: {str(e)}")
-        sys.exit(1)
+        print(f"Error generating report: {str(e)}")
+        exit(1)
