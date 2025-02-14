@@ -53,12 +53,9 @@ class MusicCollectionAnalyzer:
         return self
 
     def _process_genres(self, genres):
-        """Process genre entries with proper separator handling"""
+        """Process genre entries from dictionary with proper separator handling"""
         processed = []
-        for genre_entry in genres:
-            genre_str = genre_entry["genre"]
-            prob = genre_entry["probability"]
-
+        for genre_str, prob in genres.items():
             if "---" in genre_str:
                 parts = genre_str.split("---", 1)
             elif "—" in genre_str:
@@ -68,7 +65,6 @@ class MusicCollectionAnalyzer:
 
             parent = parts[0].strip()
             style = parts[1].strip() if len(parts) > 1 else "unknown-style"
-
             processed.append({"parent": parent, "style": style, "probability": prob})
         return processed
 
@@ -99,6 +95,25 @@ class MusicCollectionAnalyzer:
 
         parent_df = pd.DataFrame(parent_data)
         top_parents = parent_df.groupby("parent")["weight"].sum().nlargest(20)
+
+        # Create style TSV
+        style_counts = (
+            pd.Series(
+                [
+                    genre["style"]
+                    for track in self.df.genres_processed
+                    for genre in track
+                ]
+            )
+            .value_counts()
+            .reset_index()
+        )
+        style_counts.columns = ["Style", "Count"]
+        style_counts.to_csv(
+            os.path.join(self.output_dir, "style_distribution.tsv"),
+            sep="\t",
+            index=False,
+        )
 
         plt.figure()
         top_parents.sort_values().plot(kind="barh")
