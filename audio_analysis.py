@@ -157,7 +157,7 @@ def process_file(file_path, output_path, models):
         # Danceability prediction
         dance_pred = models["dance_model"](discogs_emb)
         dance_probs = dance_pred.mean(axis=0)
-        danceability = float(dance_probs[1])
+        danceability = float(dance_probs[0])
 
         # Valence/Arousal prediction
         va_pred = models["va_model"](musicnn_emb)
