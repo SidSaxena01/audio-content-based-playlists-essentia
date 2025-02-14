@@ -466,7 +466,7 @@ def render_genre_style_section(library: MusicLibrary):
             "Count": len(genre_data),
             "Total Activation": genre_data["activation"].sum(),
         }
-        
+
         stats_cols = st.columns(3)
         for i, (stat, value) in enumerate(genre_stats.items()):
             with stats_cols[i % 3]:
@@ -512,7 +512,7 @@ def render_genre_style_section(library: MusicLibrary):
             "Count": len(style_data),
             "Total Activation": style_data["activation"].sum(),
         }
-        
+
         stats_cols = st.columns(3)
         for i, (stat, value) in enumerate(style_stats.items()):
             with stats_cols[i % 3]:
@@ -552,7 +552,7 @@ def render_genre_style_section(library: MusicLibrary):
         def check_activation_range(track):
             if "music_styles" not in track:
                 return False
-            
+
             for genre_str, prob in track["music_styles"].items():
                 if prob < activation_range[0] or prob > activation_range[1]:
                     continue
@@ -567,18 +567,23 @@ def render_genre_style_section(library: MusicLibrary):
                 parent = parts[0].strip()
                 style = parts[1].strip() if len(parts) > 1 else "unknown-style"
 
-                if (not selected_genres or parent in selected_genres) and \
-                   (not selected_styles or style in selected_styles):
+                if (not selected_genres or parent in selected_genres) and (
+                    not selected_styles or style in selected_styles
+                ):
                     return True
             return False
 
-        filtered_tracks = filtered_tracks[filtered_tracks.apply(check_activation_range, axis=1)]
+        filtered_tracks = filtered_tracks[
+            filtered_tracks.apply(check_activation_range, axis=1)
+        ]
 
         st.subheader(f"Found {len(filtered_tracks)} matching tracks")
 
         if not filtered_tracks.empty:
             # Export to playlist button
-            if st.button("Export as M3U8", key="export_genre_style", use_container_width=True):
+            if st.button(
+                "Export as M3U8", key="export_genre_style", use_container_width=True
+            ):
                 with st.spinner("Creating playlist file..."):
                     try:
                         track_list = [
@@ -596,55 +601,83 @@ def render_genre_style_section(library: MusicLibrary):
                             if success:
                                 st.success("✅ Playlist exported successfully!")
                             else:
-                                st.error("❌ No valid tracks found for playlist export.")
+                                st.error(
+                                    "❌ No valid tracks found for playlist export."
+                                )
                         else:
                             st.error("❌ No tracks to export.")
                     except Exception as e:
                         st.error(f"❌ Error exporting playlist: {str(e)}")
-
+            
             # Display tracks with pagination
-            st.write("Matching tracks:")
+            st.subheader("Matching tracks:")
+            
+            # Create column headers
+            header_cols = st.columns([1, 2, 1, 1, 1])
+            with header_cols[0]:
+                st.subheader("Track ID")
+            with header_cols[1]:
+                st.subheader("Player")
+            with header_cols[2]:
+                st.subheader("Genre")
+            with header_cols[3]:
+                st.subheader("Style")
+            with header_cols[4]:
+                st.subheader("Probability")
+
             paginated_tracks = paginate_tracks(
                 filtered_tracks.to_dict("records"), "genre_style"
             )
             for track in paginated_tracks:
-                col1, col2 = st.columns([3, 1])
-                with col1:
+                # Create row columns matching the headers
+                row_cols = st.columns([1, 2, 1, 1, 1])
+                
+                # Track ID column
+                with row_cols[0]:
+                    st.write(f"**{track['track_id']}**")
+                
+                # Player column
+                with row_cols[1]:
                     safe_audio_player(track["audio_path"])
-                with col2:
-                    # Show matching genres/styles with their activations
-                    matched_info = []
-                    if "music_styles" in track:
-                        # Build list of (genre-style, probability) tuples
-                        category_probs = []
-                        for genre_str, prob in track["music_styles"].items():
-                            if prob <= 0:  # Skip zero or negative probabilities
-                                continue
+                
+                # Genre, Style, and Probability columns
+                if "music_styles" in track:
+                    # Build list of (genre-style, probability) tuples
+                    category_probs = []
+                    for genre_str, prob in track["music_styles"].items():
+                        if prob <= 0:  # Skip zero or negative probabilities
+                            continue
 
-                            if "---" in genre_str:
-                                parts = genre_str.split("---", 1)
-                            elif "—" in genre_str:
-                                parts = genre_str.split("—", 1)
-                            else:
-                                parts = [genre_str, "unknown-style"]
+                        if "---" in genre_str:
+                            parts = genre_str.split("---", 1)
+                        elif "—" in genre_str:
+                            parts = genre_str.split("—", 1)
+                        else:
+                            parts = [genre_str, "unknown-style"]
 
-                            parent = parts[0].strip()
-                            style = parts[1].strip() if len(parts) > 1 else "unknown-style"
+                        parent = parts[0].strip()
+                        style = parts[1].strip() if len(parts) > 1 else "unknown-style"
 
-                            if (not selected_genres or parent in selected_genres) and \
-                               (not selected_styles or style in selected_styles) and \
-                               activation_range[0] <= prob <= activation_range[1]:
-                                category_probs.append((f"{parent} - {style}", prob))
+                        if (
+                            (not selected_genres or parent in selected_genres)
+                            and (not selected_styles or style in selected_styles)
+                            and activation_range[0] <= prob <= activation_range[1]
+                        ):
+                            category_probs.append((parent, style, prob))
 
+                    # Sort by probability in descending order
+                    category_probs.sort(key=lambda x: x[2], reverse=True)
+                    
+                    # Display all non-zero matches in the columns
+                    if category_probs:
                         # Sort by probability in descending order
-                        category_probs.sort(key=lambda x: x[1], reverse=True)
-                        
-                        # Convert to formatted strings
-                        matched_info = [f"{cat}: {prob:.2f}" for cat, prob in category_probs]
-
-                        if matched_info:
-                            st.write("Matched categories:")
-                            st.write("\n".join(matched_info))
+                        sorted_probs = sorted(category_probs, key=lambda x: x[2], reverse=True)
+                        with row_cols[2]:
+                            st.write("\n".join([f"**{p[0]}**" for p in sorted_probs if p[2] > 0]))
+                        with row_cols[3]:
+                            st.write("\n".join([f"**{p[1]}**" for p in sorted_probs if p[2] > 0]))
+                        with row_cols[4]:
+                            st.write("\n".join([f"**{p[2]:.2f}**" for p in sorted_probs if p[2] > 0]))
 
 
 def display_descriptor_statistics(library: MusicLibrary):
