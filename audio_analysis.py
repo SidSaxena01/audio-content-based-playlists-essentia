@@ -162,21 +162,19 @@ def process_file(file_path, output_path, models):
         # Valence/Arousal prediction
         va_pred = models["va_model"](musicnn_emb)
         va_means = va_pred.mean(axis=0)
-        valence = (va_means[0] - 1) / 8.0
-        arousal = (va_means[1] - 1) / 8.0
-
-        # Compile results
+        valence = float(va_means[0])
+        arousal = float(va_means[1])
+        
         result = {
             "tempo": float(bpm),
             "loudness": float(integrated_loudness),
             "key": keys,
             "embeddings": {"discogs-effnet": discogs_mean, "msd-musicnn": musicnn_mean},
-            # "music_styles": top_genres,
             "music_styles": styles,
             "voice_instrumental": voice,
             "danceability": danceability,
-            "valence": float(valence),
-            "arousal": float(arousal),
+            "valence": valence,
+            "arousal": arousal,
         }
 
         # Save results

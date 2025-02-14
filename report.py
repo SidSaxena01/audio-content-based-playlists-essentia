@@ -58,8 +58,6 @@ class MusicCollectionAnalyzer:
         for genre_str, prob in genres.items():
             if "---" in genre_str:
                 parts = genre_str.split("---", 1)
-            elif "—" in genre_str:
-                parts = genre_str.split("—", 1)
             else:
                 parts = [genre_str, "unknown-style"]
 
@@ -223,22 +221,26 @@ class MusicCollectionAnalyzer:
         return self
 
     def analyze_emotion(self):
-        """Generate both emotion plots"""
-        # Original joint plot
+        """Generate both emotion plots using normalized values"""
+        # Normalize raw valence/arousal values from [1,9] to [-1,1]
+        norm_valence = (self.df["valence"] - 5) / 4.0
+        norm_arousal = (self.df["arousal"] - 5) / 4.0
+
+        # joint plot with normalized values
         plt.figure()
         sns.jointplot(
-            x=self.df["valence"], y=self.df["arousal"], kind="hex", cmap="viridis"
+            x=norm_valence, y=norm_arousal, kind="hex", cmap="viridis"
         )
         plt.suptitle("Valence-Arousal Emotion Space")
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "emotion_space_joint.png"))
         plt.close()
 
-        # another plot with quadrant labels
+        # Another plot with quadrant labels using normalized values
         plt.figure(figsize=(12, 10))
         hexbin = plt.hexbin(
-            self.df["valence"],
-            self.df["arousal"],
+            norm_valence,
+            norm_arousal,
             gridsize=25,
             cmap="viridis",
             mincnt=1,
