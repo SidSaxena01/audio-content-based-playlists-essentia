@@ -2,6 +2,7 @@ import argparse
 import json
 import logging
 import os
+from multiprocessing import Pool, current_process
 from pathlib import Path
 
 import essentia.standard as es
@@ -128,9 +129,15 @@ def process_file(file_path, output_path, models):
         musicnn_mean = musicnn_emb.mean(axis=0).tolist()
 
         # Music style classification
+
         genre_pred = models["genre_model"](discogs_emb)
         genre_probs = genre_pred.mean(axis=0)
-        sorted_indices = np.argsort(genre_probs)[::-1][:2]  # top 2
+        styles = {
+            models["genre_metadata"]["classes"][i]: float(p)
+            for i, p in enumerate(genre_probs)
+        }
+
+        sorted_indices = np.argsort(genre_probs)[::-1][:2]
         top_genres = [
             {
                 "genre": models["genre_metadata"]["classes"][i],
@@ -138,6 +145,7 @@ def process_file(file_path, output_path, models):
             }
             for i in sorted_indices
         ]
+
         # Voice/instrumental classification
         voice_pred = models["voice_model"](discogs_emb)
         voice_probs = voice_pred.mean(axis=0)
@@ -149,12 +157,12 @@ def process_file(file_path, output_path, models):
         # Danceability prediction
         dance_pred = models["dance_model"](discogs_emb)
         dance_probs = dance_pred.mean(axis=0)
-        danceability = float(dance_probs[1])  # Assuming index 1 is danceable
+        danceability = float(dance_probs[1])
 
         # Valence/Arousal prediction
         va_pred = models["va_model"](musicnn_emb)
         va_means = va_pred.mean(axis=0)
-        valence = (va_means[0] - 1) / 8.0  # Scale from 1-9 to 0-1
+        valence = (va_means[0] - 1) / 8.0
         arousal = (va_means[1] - 1) / 8.0
 
         # Compile results
@@ -163,7 +171,8 @@ def process_file(file_path, output_path, models):
             "loudness": float(integrated_loudness),
             "key": keys,
             "embeddings": {"discogs-effnet": discogs_mean, "msd-musicnn": musicnn_mean},
-            "music_styles": top_genres,
+            # "music_styles": top_genres,
+            "music_styles": styles,
             "voice_instrumental": voice,
             "danceability": danceability,
             "valence": float(valence),
@@ -177,38 +186,66 @@ def process_file(file_path, output_path, models):
 
         return True
     except Exception as e:
-        logging.error(f"Error processing {file_path}: {str(e)}")
+        logging.error(
+            f"Error processing {file_path} in {current_process().name}: {str(e)}"
+        )
         return False
 
 
+# Global variable to hold models in each worker
+models_global = None
+
+
+def worker_initializer(models_dir):
+    global models_global
+    models_global = load_models(models_dir)
+    logging.info(f"{current_process().name} initialized models.")
+
+
+def process_task(args):
+    file_path, output_path = args
+    return process_file(file_path, output_path, models_global)
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Analyze audio files with Essentia")
+    parser = argparse.ArgumentParser(
+        description="Parallel audio file analysis with Essentia"
+    )
     parser.add_argument("input_dir", help="Directory containing audio files")
     parser.add_argument("output_dir", help="Directory to save analysis results")
     parser.add_argument(
         "--models_dir", default="models", help="Directory containing models"
     )
+    parser.add_argument(
+        "--workers", type=int, default=4, help="Number of worker processes"
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
-    models = load_models(args.models_dir)
+    input_dir = args.input_dir
+    output_dir = args.output_dir
 
-    # Find all MP3 files using rglob
-    mp3_files = list(Path(args.input_dir).rglob("*.mp3"))
+    # Collect all MP3 files recursively
+    mp3_files = list(Path(input_dir).rglob("*.mp3"))
+    tasks = []
+    for file_path in mp3_files:
+        rel_path = os.path.relpath(file_path, input_dir)
+        out_path = os.path.join(output_dir, os.path.splitext(rel_path)[0] + ".json")
+        if not os.path.exists(out_path):
+            tasks.append((str(file_path), out_path))
 
-    # Process files with progress bar
-    for file_path in tqdm(mp3_files, desc="Processing files"):
-        rel_path = os.path.relpath(file_path, args.input_dir)
-        output_path = os.path.join(
-            args.output_dir, os.path.splitext(rel_path)[0] + ".json"
-        )
-
-        if os.path.exists(output_path):
-            continue
-
-        success = process_file(file_path, output_path, models)
-        if not success:
-            logging.warning(f"Skipped {file_path} due to errors")
+    with Pool(
+        processes=args.workers,
+        initializer=worker_initializer,
+        initargs=(args.models_dir,),
+    ) as pool:
+        for success in tqdm(
+            pool.imap_unordered(process_task, tasks),
+            total=len(tasks),
+            desc="Processing files",
+        ):
+            if not success:
+                logging.warning("A file was skipped due to an error.")
 
 
 if __name__ == "__main__":
