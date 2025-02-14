@@ -450,26 +450,44 @@ def render_genre_style_section(library: MusicLibrary):
     col1, col2 = st.columns(2)
 
     with col1:
-        # Genre distribution
-        st.subheader("Genre Distribution")
+        # Genre selection and statistics
+        st.subheader("Genre Analysis")
         genre_data = pd.DataFrame.from_dict(
-            library.genre_stats, orient="index", columns=["count"]
-        ).sort_values("count", ascending=False)
+            library.genre_stats, orient="index", columns=["activation"]
+        ).sort_values("activation", ascending=False)
 
+        # Display overall genre statistics
+        st.caption("Genre Activation Statistics")
+        genre_stats = {
+            "Mean": genre_data["activation"].mean(),
+            "Std": genre_data["activation"].std(),
+            "Min": genre_data["activation"].min(),
+            "Max": genre_data["activation"].max(),
+            "Count": len(genre_data),
+            "Total Activation": genre_data["activation"].sum(),
+        }
+        
+        stats_cols = st.columns(3)
+        for i, (stat, value) in enumerate(genre_stats.items()):
+            with stats_cols[i % 3]:
+                st.metric(stat, f"{value:.2f}" if isinstance(value, float) else value)
+
+        # Genre distribution plot
         fig_genres = px.bar(
             genre_data.head(20),
             title="Top 20 Genres",
-            labels={"index": "Genre", "count": "Cumulative Probability"},
+            labels={"index": "Genre", "activation": "Activation"},
         )
-        st.plotly_chart(fig_genres)
+        fig_genres.update_layout(height=300)
+        st.plotly_chart(fig_genres, use_container_width=True)
 
         selected_genres = st.multiselect(
             "Select Genres", options=sorted(library.genre_stats.keys())
         )
 
     with col2:
-        # Style distribution - show only styles for selected genres
-        st.subheader("Style Distribution")
+        # Style selection and statistics
+        st.subheader("Style Analysis")
         available_styles = set()
         if selected_genres:
             for genre in selected_genres:
@@ -481,30 +499,111 @@ def render_genre_style_section(library: MusicLibrary):
         style_data = pd.DataFrame.from_dict(
             {k: v for k, v in library.style_stats.items() if k in available_styles},
             orient="index",
-            columns=["count"],
-        ).sort_values("count", ascending=False)
+            columns=["activation"],
+        ).sort_values("activation", ascending=False)
 
+        # Display style statistics
+        st.caption("Style Activation Statistics")
+        style_stats = {
+            "Mean": style_data["activation"].mean(),
+            "Std": style_data["activation"].std(),
+            "Min": style_data["activation"].min(),
+            "Max": style_data["activation"].max(),
+            "Count": len(style_data),
+            "Total Activation": style_data["activation"].sum(),
+        }
+        
+        stats_cols = st.columns(3)
+        for i, (stat, value) in enumerate(style_stats.items()):
+            with stats_cols[i % 3]:
+                st.metric(stat, f"{value:.2f}" if isinstance(value, float) else value)
+
+        # Style distribution plot
         fig_styles = px.bar(
             style_data.head(20),
             title="Top 20 Styles",
-            labels={"index": "Style", "count": "Cumulative Probability"},
+            labels={"index": "Style", "activation": "Activation"},
         )
-        st.plotly_chart(fig_styles)
+        fig_styles.update_layout(height=300)
+        st.plotly_chart(fig_styles, use_container_width=True)
 
         selected_styles = st.multiselect(
             "Select Styles", options=sorted(available_styles)
         )
 
+    # Activation range filter
+    st.subheader("Activation Range Filter")
+    activation_range = st.slider(
+        "Filter by activation probability",
+        min_value=0.0,
+        max_value=1.0,
+        value=(0.1, 1.0),
+        step=0.05,
+    )
+
+    # Filter and display tracks
     if selected_genres or selected_styles:
         filtered_tracks = library.filter_tracks(
-            genres=selected_genres, styles=selected_styles
+            genres=selected_genres,
+            styles=selected_styles,
         )
+
+        # Additional filtering by activation range
+        def check_activation_range(track):
+            if "music_styles" not in track:
+                return False
+            
+            for genre_str, prob in track["music_styles"].items():
+                if prob < activation_range[0] or prob > activation_range[1]:
+                    continue
+
+                if "---" in genre_str:
+                    parts = genre_str.split("---", 1)
+                elif "—" in genre_str:
+                    parts = genre_str.split("—", 1)
+                else:
+                    parts = [genre_str, "unknown-style"]
+
+                parent = parts[0].strip()
+                style = parts[1].strip() if len(parts) > 1 else "unknown-style"
+
+                if (not selected_genres or parent in selected_genres) and \
+                   (not selected_styles or style in selected_styles):
+                    return True
+            return False
+
+        filtered_tracks = filtered_tracks[filtered_tracks.apply(check_activation_range, axis=1)]
 
         st.subheader(f"Found {len(filtered_tracks)} matching tracks")
 
         if not filtered_tracks.empty:
-            st.write("Sample tracks:")
-            # Update to use pagination
+            # Export to playlist button
+            if st.button("Export as M3U8", key="export_genre_style", use_container_width=True):
+                with st.spinner("Creating playlist file..."):
+                    try:
+                        track_list = [
+                            {
+                                "track_id": row["track_id"],
+                                "audio_path": row["audio_path"],
+                            }
+                            for _, row in filtered_tracks.iterrows()
+                        ]
+                        if track_list:
+                            success = create_m3u8_playlist(
+                                track_list,
+                                "genre_style_playlist.m3u8",
+                            )
+                            if success:
+                                st.success("✅ Playlist exported successfully!")
+                            else:
+                                st.error("❌ No valid tracks found for playlist export.")
+                        else:
+                            st.error("❌ No tracks to export.")
+                    except Exception as e:
+                        st.error(f"❌ Error exporting playlist: {str(e)}")
+
+            # Display tracks with pagination
+            st.write("Matching tracks:")
             paginated_tracks = paginate_tracks(
                 filtered_tracks.to_dict("records"), "genre_style"
             )
@@ -513,10 +612,15 @@ def render_genre_style_section(library: MusicLibrary):
                 with col1:
                     safe_audio_player(track["audio_path"])
                 with col2:
-                    # Show only the matching genres/styles
+                    # Show matching genres/styles with their activations
                     matched_info = []
                     if "music_styles" in track:
-                        for genre_str in track["music_styles"].keys():
+                        # Build list of (genre-style, probability) tuples
+                        category_probs = []
+                        for genre_str, prob in track["music_styles"].items():
+                            if prob <= 0:  # Skip zero or negative probabilities
+                                continue
+
                             if "---" in genre_str:
                                 parts = genre_str.split("---", 1)
                             elif "—" in genre_str:
@@ -525,53 +629,22 @@ def render_genre_style_section(library: MusicLibrary):
                                 parts = [genre_str, "unknown-style"]
 
                             parent = parts[0].strip()
-                            style = (
-                                parts[1].strip() if len(parts) > 1 else "unknown-style"
-                            )
+                            style = parts[1].strip() if len(parts) > 1 else "unknown-style"
 
-                            if (not selected_genres or parent in selected_genres) and (
-                                not selected_styles or style in selected_styles
-                            ):
-                                matched_info.append(f"{parent} - {style}")
+                            if (not selected_genres or parent in selected_genres) and \
+                               (not selected_styles or style in selected_styles) and \
+                               activation_range[0] <= prob <= activation_range[1]:
+                                category_probs.append((f"{parent} - {style}", prob))
+
+                        # Sort by probability in descending order
+                        category_probs.sort(key=lambda x: x[1], reverse=True)
+                        
+                        # Convert to formatted strings
+                        matched_info = [f"{cat}: {prob:.2f}" for cat, prob in category_probs]
 
                         if matched_info:
-                            st.write("Matched categories:", ", ".join(matched_info))
-
-            if st.button("Get Similar Tracks"):
-                recommendations = library.get_genre_style_recommendations(
-                    filtered_tracks,
-                    selected_genres=selected_genres,
-                    selected_styles=selected_styles,
-                )
-
-                if recommendations:
-                    st.subheader("Recommended Tracks")
-                    # Update to use pagination
-                    paginated_recommendations = paginate_tracks(
-                        recommendations, "genre_recommendations"
-                    )
-                    for rec in paginated_recommendations:
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            safe_audio_player(rec["audio_path"])
-                        with col2:
-                            st.write(f"Similarity: {rec['similarity']:.2f}")
-                            if rec["matched_genres"]:
-                                st.write("Genres:", ", ".join(rec["matched_genres"]))
-                            if rec["matched_styles"]:
-                                st.write("Styles:", ", ".join(rec["matched_styles"]))
-                else:
-                    st.warning(
-                        "No similar tracks found matching the selected criteria."
-                    )
-
-                if st.button("Export Recommendations as M3U8"):
-                    with st.spinner("Exporting recommendations playlist..."):
-                        playlist_path = "genre_recommendations.m3u8"
-                        if create_m3u8_playlist(recommendations, playlist_path):
-                            st.success(f"Playlist exported to {playlist_path}")
-                        else:
-                            st.error("Failed to export recommendations playlist.")
+                            st.write("Matched categories:")
+                            st.write("\n".join(matched_info))
 
 
 def display_descriptor_statistics(library: MusicLibrary):
