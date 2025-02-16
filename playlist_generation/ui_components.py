@@ -72,11 +72,11 @@ def reset_descriptor_filters() -> None:
     """
     Reset all descriptor filters to their default values by updating st.session_state.
     """
-    st.session_state.tempo_range = (60, 180)
+    st.session_state.tempo_range = (60, 190)
     st.session_state.danceability_range = (0.0, 1.0)
     st.session_state.arousal_range = (-1.0, 1.0)
     st.session_state.valence_range = (-1.0, 1.0)
-    st.session_state.loudness_range = (-30.0, -10.0)
+    st.session_state.loudness_range = (-30.0, -5.0)
     st.session_state.has_vocals = None
     st.session_state.selected_keys = []
     st.session_state.selected_scale = "Any"
@@ -245,7 +245,7 @@ def compute_track_statistics(tracks_df: pd.DataFrame) -> Dict[str, Any]:
         key_counts = (
             tracks_df["key"].apply(lambda x: x[key_profile]["key"]).value_counts()
         )
-        stats["key"] = {"label": "Key Distribution", "values": key_counts.to_dict()}
+        stats["key"] = {"label": "Key", "values": key_counts.to_dict()}
     return stats
 
 
@@ -329,7 +329,7 @@ def display_detailed_tracks(tracks_df: pd.DataFrame, tracks_per_page: int = 5) -
         st.session_state.current_filtered_tracks = tracks_df
     current_tracks = st.session_state.current_filtered_tracks
 
-    st.subheader("Individual Track Values", divider="gray")
+    st.subheader("Tracks Statistics", divider="gray")
     track_data = []
     stats = compute_track_statistics(current_tracks)
     for _, track in current_tracks.iterrows():
@@ -355,7 +355,7 @@ def display_detailed_tracks(tracks_df: pd.DataFrame, tracks_per_page: int = 5) -
             use_container_width=True,
         )
 
-    st.subheader("Individual Tracks", divider="gray")
+    st.subheader("Tracks", divider="gray")
     tracks_records = current_tracks.to_dict("records")
     paginated_tracks = paginate_tracks(
         tracks_records, "descriptor_tracks", tracks_per_page
@@ -431,7 +431,7 @@ def create_playlist_name(base: str, metadata: dict) -> str:
     """Create a descriptive playlist name with relevant metadata."""
     timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
     name_parts = [base]
-    
+
     if "reference_track" in metadata:
         name_parts.append(f"ref_{metadata['reference_track']}")
     if "genres" in metadata and metadata["genres"]:
@@ -447,7 +447,7 @@ def create_playlist_name(base: str, metadata: dict) -> str:
                 desc_parts.append(f"{k}_{v}")
         if desc_parts:
             name_parts.append("desc_" + "-".join(desc_parts[:3]))
-    
+
     name_parts.append(timestamp)
     return "_".join(name_parts) + ".m3u8"
 
@@ -462,7 +462,8 @@ def render_descriptor_tab(library: MusicLibrary) -> None:
         st.caption("Statistics are computed across all tracks in the library")
         display_descriptor_statistics(library)
 
-    st.header("Generate Playlist by Musical Characteristics")
+    st.markdown("---")
+    st.header("Generate Playlist by Musical Characteristics", divider="gray")
     if "filtered_tracks" not in st.session_state:
         st.session_state.filtered_tracks = None
     if "current_page" not in st.session_state:
@@ -470,7 +471,7 @@ def render_descriptor_tab(library: MusicLibrary) -> None:
 
     # Ensure session state values exist so that the reset button can update them
     if "tempo_range" not in st.session_state:
-        st.session_state.tempo_range = (60, 180)
+        st.session_state.tempo_range = (60, 190)
     if "danceability_range" not in st.session_state:
         st.session_state.danceability_range = (0.0, 1.0)
     if "arousal_range" not in st.session_state:
@@ -478,7 +479,7 @@ def render_descriptor_tab(library: MusicLibrary) -> None:
     if "valence_range" not in st.session_state:
         st.session_state.valence_range = (-1.0, 1.0)
     if "loudness_range" not in st.session_state:
-        st.session_state.loudness_range = (-30.0, -10.0)
+        st.session_state.loudness_range = (-30.0, -5.0)
     if "has_vocals" not in st.session_state:
         st.session_state.has_vocals = None
     if "selected_keys" not in st.session_state:
@@ -491,7 +492,7 @@ def render_descriptor_tab(library: MusicLibrary) -> None:
     col_rm1, col_rm2 = st.columns(2)
     with col_rm1:
         tempo_range = st.slider(
-            "Tempo Range (BPM)", 0, 200, st.session_state.tempo_range, key="tempo_range"
+            "Tempo Range (BPM)", 0, 250, st.session_state.tempo_range, key="tempo_range"
         )
     with col_rm2:
         danceability_range = st.slider(
@@ -529,24 +530,23 @@ def render_descriptor_tab(library: MusicLibrary) -> None:
         fig = plot_valence_arousal_range(valence_range, arousal_range)
         st.plotly_chart(fig, use_container_width=True)
 
-    # Row 3: Additional Filters - Musical Key, Sound & Voice, and Reset Filters
-    st.subheader("Additional Filters")
-    col_key, col_sv, col_reset = st.columns([1, 1, 0.5])
+    # Row 3: Additional Filters - Musical Key and Sound & Voice
+    col_key, col_sv = st.columns([1, 1])
     with col_key:
         st.subheader("Musical Key")
         key_options = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-        selected_keys = st.multiselect("Key", options=key_options, key="selected_keys")
+        selected_keys = st.multiselect("**Key**", options=key_options, key="selected_keys")
         key_filter = selected_keys if selected_keys else None
         scale_options = ["major", "minor"]
         selected_scale = st.selectbox(
-            "Scale", ["Any"] + scale_options, key="selected_scale"
+            "**Scale**", ["Any"] + scale_options, key="selected_scale"
         )
         scale_filter = selected_scale if selected_scale != "Any" else None
 
     with col_sv:
         st.subheader("Sound & Voice")
         has_vocals = st.radio(
-            "Vocal Content",
+            "**Vocal Content**",
             [None, True, False],
             format_func=lambda x: "Any"
             if x is None
@@ -556,26 +556,23 @@ def render_descriptor_tab(library: MusicLibrary) -> None:
             key="has_vocals",
         )
         loudness_range = st.slider(
-            "Loudness Range (dB)",
-            -60.0,
+            "**Loudness Range (dB)**",
+            -40.0,
             0.0,
             st.session_state.loudness_range,
             key="loudness_range",
         )
 
-    with col_reset:
-        if st.button(
-            "Reset Filters", key="reset_filters", on_click=reset_descriptor_filters
-        ):
-            st.rerun()
-
     button_cols = st.columns([1.5, 0.5, 2])
     with button_cols[0]:
-        col_btn1, col_btn2 = st.columns([2, 1])
+        col_btn1, col_btn2, col_btn3 = st.columns([2, 1, 1])
         with col_btn1:
             generate_button = st.button("Generate Playlist", use_container_width=True)
         with col_btn2:
             shuffle_results = st.checkbox("Shuffle", value=False)
+        with col_btn3:
+            if st.button("Reset Filters", key="reset_filters", on_click=reset_descriptor_filters):
+                st.rerun()
     with button_cols[2]:
         if st.session_state.filtered_tracks is not None:
             if st.button(
@@ -599,21 +596,38 @@ def render_descriptor_tab(library: MusicLibrary) -> None:
                                     "arousal": arousal_range,
                                     "valence": valence_range,
                                     "loudness": loudness_range,
-                                    "vocals": "yes" if has_vocals else "no" if has_vocals is False else "any",
-                                    "key": ','.join(selected_keys) if selected_keys else "any",
-                                    "scale": selected_scale
-                                }
+                                    "vocals": "yes"
+                                    if has_vocals
+                                    else "no"
+                                    if has_vocals is False
+                                    else "any",
+                                    "key": ",".join(selected_keys)
+                                    if selected_keys
+                                    else "any",
+                                    "scale": selected_scale,
+                                },
                             }
-                            playlist_name = create_playlist_name("descriptor", descriptor_metadata)
-                            success = create_m3u8_playlist(track_list, playlist_name, descriptor_metadata)
+                            playlist_name = create_playlist_name(
+                                "descriptor", descriptor_metadata
+                            )
+                            success = create_m3u8_playlist(
+                                track_list, playlist_name, descriptor_metadata
+                            )
                             if success:
-                                st.success(f"✅ Playlist exported successfully as '{playlist_name}'!")
+                                st.success(
+                                    f"✅ Playlist exported successfully as '{playlist_name}'!"
+                                )
                             else:
-                                st.error("❌ No valid tracks found for playlist export. Please adjust your filters.")
+                                st.error(
+                                    "❌ No valid tracks found for playlist export. Please adjust your filters."
+                                )
                         else:
-                            st.error("❌ No tracks to export. Try adjusting your filter criteria.")
+                            st.error(
+                                "❌ No tracks to export. Try adjusting your filter criteria."
+                            )
                     except Exception as e:
                         st.error(f"❌ Error exporting playlist: {str(e)}")
+
 
     if generate_button:
         filtered_tracks = library.filter_tracks(
@@ -642,6 +656,7 @@ def render_descriptor_tab(library: MusicLibrary) -> None:
             "✨ Click here to View Summary Statistics, Distributions & Key Distribution ✨"
         ):
             display_summary_stats(filtered_tracks)
+        st.markdown("---")
     if st.session_state.filtered_tracks is not None:
         from ui_components import display_detailed_tracks  # Local import
 
@@ -654,7 +669,7 @@ def render_similarity_tab(library: MusicLibrary) -> None:
     display similar tracks using two algorithms, and view results in three sub-tabs.
     Each sub-tab includes an export button that exports only the tracks shown in that tab.
     """
-    st.header("Generate Playlist by Track Similarity")
+    st.header("Generate Playlist by Track Similarity", divider="gray")
 
     # Create a single row with three columns for search, select, and player
     search_col, select_col, player_col = st.columns([1, 2, 1])
@@ -761,6 +776,7 @@ def render_similarity_tab(library: MusicLibrary) -> None:
         return
 
     if hasattr(st.session_state, "effnet_tracks"):
+        st.markdown("---")
         st.markdown("## Results Analysis")
         overlap_analysis = analyze_similarity_overlap(
             st.session_state.effnet_tracks, st.session_state.musicnn_tracks
@@ -774,29 +790,49 @@ def render_similarity_tab(library: MusicLibrary) -> None:
         # Two export buttons in separate columns:
         col_export1, col_export2 = st.columns(2)
         with col_export1:
-            if st.button("Export Discogs-Effnet Playlist 🎶", key="export_effnet", use_container_width=True):
+            if st.button(
+                "Export Discogs-Effnet Playlist 🎶",
+                key="export_effnet",
+                use_container_width=True,
+            ):
                 metadata = {
                     "method": "similarity-discogs-effnet",
                     "reference_track": selected_track,
-                    "similarity_threshold": similarity_threshold / 100.0
+                    "similarity_threshold": similarity_threshold / 100.0,
                 }
                 playlist_name = create_playlist_name("similar_effnet", metadata)
-                if create_m3u8_playlist(st.session_state.effnet_tracks, playlist_name, metadata):
-                    st.success(f"✅ Discogs-Effnet similarity playlist exported as '{playlist_name}'!")
+                if create_m3u8_playlist(
+                    st.session_state.effnet_tracks, playlist_name, metadata
+                ):
+                    st.success(
+                        f"✅ Discogs-Effnet similarity playlist exported as '{playlist_name}'!"
+                    )
                 else:
-                    st.error("❌ Export failed. No valid tracks found matching the similarity criteria.")
+                    st.error(
+                        "❌ Export failed. No valid tracks found matching the similarity criteria."
+                    )
         with col_export2:
-            if st.button("Export MSD-Musicnn Playlist 🎶", key="export_musicnn", use_container_width=True):
+            if st.button(
+                "Export MSD-Musicnn Playlist 🎶",
+                key="export_musicnn",
+                use_container_width=True,
+            ):
                 metadata = {
                     "method": "similarity-msd-musicnn",
                     "reference_track": selected_track,
-                    "similarity_threshold": similarity_threshold / 100.0
+                    "similarity_threshold": similarity_threshold / 100.0,
                 }
                 playlist_name = create_playlist_name("similar_musicnn", metadata)
-                if create_m3u8_playlist(st.session_state.musicnn_tracks, playlist_name, metadata):
-                    st.success(f"✅ MSD-Musicnn similarity playlist exported as '{playlist_name}'!")
+                if create_m3u8_playlist(
+                    st.session_state.musicnn_tracks, playlist_name, metadata
+                ):
+                    st.success(
+                        f"✅ MSD-Musicnn similarity playlist exported as '{playlist_name}'!"
+                    )
                 else:
-                    st.error("❌ Export failed. No valid tracks found matching the similarity criteria.")
+                    st.error(
+                        "❌ Export failed. No valid tracks found matching the similarity criteria."
+                    )
 
         # Now display the two sets side-by-side
         col_left, col_right = st.columns(2)
@@ -853,13 +889,19 @@ def render_similarity_tab(library: MusicLibrary) -> None:
                 metadata = {
                     "method": "similarity-overlap",
                     "reference_track": selected_track,
-                    "similarity_threshold": similarity_threshold / 100.0
+                    "similarity_threshold": similarity_threshold / 100.0,
                 }
                 playlist_name = create_playlist_name("similar_overlap", metadata)
-                if create_m3u8_playlist(overlap_analysis["overlap_tracks"], playlist_name, metadata):
-                    st.success(f"✅ Overlapping similar tracks playlist exported as '{playlist_name}'!")
+                if create_m3u8_playlist(
+                    overlap_analysis["overlap_tracks"], playlist_name, metadata
+                ):
+                    st.success(
+                        f"✅ Overlapping similar tracks playlist exported as '{playlist_name}'!"
+                    )
                 else:
-                    st.error("❌ Export failed. No overlapping tracks found matching the similarity criteria.")
+                    st.error(
+                        "❌ Export failed. No overlapping tracks found matching the similarity criteria."
+                    )
             if overlap_analysis["overlap_tracks"]:
                 st.subheader(
                     f"Tracks Found by Both Methods ({overlap_analysis['overlap_count']})"
@@ -920,11 +962,13 @@ def render_similarity_tab(library: MusicLibrary) -> None:
                 metadata = {
                     "method": "similarity-all",
                     "reference_track": selected_track,
-                    "similarity_threshold": similarity_threshold / 100.0
+                    "similarity_threshold": similarity_threshold / 100.0,
                 }
                 playlist_name = create_playlist_name("similar_all", metadata)
                 if create_m3u8_playlist(all_tracks_combined, playlist_name, metadata):
-                    st.success(f"✅ Playlist exported successfully as '{playlist_name}'!")
+                    st.success(
+                        f"✅ Playlist exported successfully as '{playlist_name}'!"
+                    )
                 else:
                     st.error("Playlist export failed.")
             st.subheader("All Results")
@@ -972,7 +1016,8 @@ def render_genre_style_tab(library: MusicLibrary) -> None:
 
     Displays genre/style statistics, plots, filtering options, and paginated track results.
     """
-    st.header("Genre & Style Analysis")
+    st.header("Genre & Style Analysis", divider="gray")
+
     col1, col2 = st.columns(2)
 
     with col1:
@@ -987,7 +1032,6 @@ def render_genre_style_tab(library: MusicLibrary) -> None:
             "Min": genre_data["activation"].min(),
             "Max": genre_data["activation"].max(),
             "Count": len(genre_data),
-            "Total Activation": genre_data["activation"].sum(),
         }
         stats_cols = st.columns(3)
         for idx, (stat, value) in enumerate(genre_stats.items()):
@@ -995,7 +1039,7 @@ def render_genre_style_tab(library: MusicLibrary) -> None:
                 st.metric(stat, f"{value:.2f}" if isinstance(value, float) else value)
         fig_genres = px.bar(
             genre_data.head(20),
-            title="Top 20 Genres",
+            title="Genres",
             labels={"index": "Genre", "activation": "Activation"},
         )
         fig_genres.update_layout(height=300)
@@ -1024,15 +1068,14 @@ def render_genre_style_tab(library: MusicLibrary) -> None:
             "Min": style_data["activation"].min(),
             "Max": style_data["activation"].max(),
             "Count": len(style_data),
-            "Total Activation": style_data["activation"].sum(),
-        }
+        }  # Removed 'Total Activation' from here
         stats_cols = st.columns(3)
         for idx, (stat, value) in enumerate(style_stats.items()):
             with stats_cols[idx % 3]:
                 st.metric(stat, f"{value:.2f}" if isinstance(value, float) else value)
         fig_styles = px.bar(
-            style_data.head(20),
-            title="Top 20 Styles",
+            style_data.head(10),
+            title="Top 10 Styles",
             labels={"index": "Style", "activation": "Activation"},
         )
         fig_styles.update_layout(height=300)
@@ -1042,6 +1085,7 @@ def render_genre_style_tab(library: MusicLibrary) -> None:
         )
 
     st.subheader("Activation Range Filter")
+    st.markdown("---")
     activation_range = st.slider(
         "Filter by activation probability",
         min_value=0.0,
@@ -1050,6 +1094,7 @@ def render_genre_style_tab(library: MusicLibrary) -> None:
         step=0.05,
     )
     if selected_genres or selected_styles:
+        st.markdown("---")
         filtered_tracks = library.filter_tracks(
             genres=selected_genres, styles=selected_styles
         )
@@ -1071,6 +1116,7 @@ def render_genre_style_tab(library: MusicLibrary) -> None:
             filtered_tracks.apply(check_activation_range, axis=1)
         ]
         st.subheader(f"Found {len(filtered_tracks)} matching tracks")
+        st.markdown("---")
         if st.button(
             "Export as M3U8 🎷", key="export_genre_style", use_container_width=True
         ):
@@ -1087,16 +1133,24 @@ def render_genre_style_tab(library: MusicLibrary) -> None:
                             "method": "genre-style",
                             "genres": selected_genres,
                             "styles": selected_styles,
-                            "descriptors": {"activation": activation_range}
+                            "descriptors": {"activation": activation_range},
                         }
                         playlist_name = create_playlist_name("genre_style", metadata)
-                        success = create_m3u8_playlist(track_list, playlist_name, metadata)
+                        success = create_m3u8_playlist(
+                            track_list, playlist_name, metadata
+                        )
                         if success:
-                            st.success(f"✅ Genre & Style playlist exported successfully as '{playlist_name}'!")
+                            st.success(
+                                f"✅ Genre & Style playlist exported successfully as '{playlist_name}'!"
+                            )
                         else:
-                            st.error("❌ No valid tracks found for playlist export. Please adjust your genre/style selections.")
+                            st.error(
+                                "❌ No valid tracks found for playlist export. Please adjust your genre/style selections."
+                            )
                     else:
-                        st.error("❌ No tracks to export. Try selecting different genres or styles.")
+                        st.error(
+                            "❌ No tracks to export. Try selecting different genres or styles."
+                        )
                 except Exception as e:
                     st.error(f"❌ Error exporting playlist: {str(e)}")
         st.subheader("Matching Tracks:")

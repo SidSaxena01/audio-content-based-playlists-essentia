@@ -17,11 +17,17 @@ def configure_library() -> tuple[str, str, bool]:
         tuple[str, str, bool]: (analysis_dir, audio_dir, is_valid)
     """
     st.sidebar.header("Library Configuration")
+    st.sidebar.markdown("---")
     project_dirs = get_valid_directories()
     dir_options = [(display, path) for display, path in project_dirs]
 
     # Analysis Directory Configuration
     st.sidebar.subheader("Analysis Directory")
+    st.sidebar.info("""
+        Select the directory containing JSON analysis files.
+        This should be the output directory from running the audio analysis script.
+        Files should have the .json extension and contain audio analysis results.
+    """)
     use_proj_analysis = st.sidebar.checkbox(
         "Use Project Directory", value=True, key="use_proj_analysis"
     )
@@ -47,6 +53,11 @@ def configure_library() -> tuple[str, str, bool]:
 
     # Audio Directory Configuration
     st.sidebar.subheader("Audio Files Directory")
+    st.sidebar.info("""
+        Select the directory containing your audio files.
+        This should be your music library folder containing MP3 files
+        that were analyzed by the audio analysis script.
+    """)
     use_proj_audio = st.sidebar.checkbox(
         "Use Project Directory", value=True, key="use_proj_audio"
     )
@@ -70,17 +81,36 @@ def configure_library() -> tuple[str, str, bool]:
         )
 
     # Validate Directories and provide feedback in the sidebar
-    valid_analysis, analysis_err = validate_directory(analysis_dir)
-    valid_audio, audio_err = validate_directory(audio_dir)
+    valid_analysis, analysis_msg = validate_directory(analysis_dir)
+    valid_audio, audio_msg = validate_directory(audio_dir)
 
-    if not valid_analysis:
-        st.sidebar.error(f"Analysis Directory Error: {analysis_err}")
+    st.sidebar.subheader("Directory Validation", divider="gray")
+
+    # Analysis directory validation feedback
+    st.sidebar.markdown("##### Analysis Directory Status:")
+    if valid_analysis:
+        st.sidebar.success(analysis_msg)
     else:
-        st.sidebar.success("Analysis Directory Valid")
-    if not valid_audio:
-        st.sidebar.error(f"Audio Directory Error: {audio_err}")
+        st.sidebar.error(analysis_msg)
+        if "No JSON files found" in analysis_msg:
+            st.sidebar.warning("""
+                ⚠️ The analysis directory should contain JSON files with audio analysis results.
+                If you haven't analyzed your music library yet:
+                1. Run the audio analysis script first
+                2. Point to the directory containing the analysis results
+            """)
+
+    # Audio directory validation feedback
+    st.sidebar.markdown("##### Audio Directory Status:")
+    if valid_audio:
+        st.sidebar.success(audio_msg)
     else:
-        st.sidebar.success("Audio Directory Valid")
+        st.sidebar.error(audio_msg)
+        if "No MP3 files found" in audio_msg:
+            st.sidebar.warning("""
+                ⚠️ The audio directory should contain your music files in MP3 format.
+                Make sure you're pointing to the correct music library folder.
+            """)
 
     return analysis_dir, audio_dir, (valid_analysis and valid_audio)
 
@@ -122,6 +152,7 @@ def main() -> None:
         <style>
         .stTabs [data-baseweb="tab-list"] { justify-content: center; }
         .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p { font-size: 24px; }
+        hr { margin: 1em 0; }
         </style>
         """,
         unsafe_allow_html=True,
