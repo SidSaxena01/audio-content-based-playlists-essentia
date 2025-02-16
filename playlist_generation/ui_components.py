@@ -427,6 +427,31 @@ def analyze_similarity_overlap(
     }
 
 
+def create_playlist_name(base: str, metadata: dict) -> str:
+    """Create a descriptive playlist name with relevant metadata."""
+    timestamp = pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")
+    name_parts = [base]
+    
+    if "reference_track" in metadata:
+        name_parts.append(f"ref_{metadata['reference_track']}")
+    if "genres" in metadata and metadata["genres"]:
+        name_parts.append(f"genres_{'-'.join(metadata['genres'][:3])}")
+    if "styles" in metadata and metadata["styles"]:
+        name_parts.append(f"styles_{'-'.join(metadata['styles'][:3])}")
+    if "descriptors" in metadata:
+        desc_parts = []
+        for k, v in metadata["descriptors"].items():
+            if isinstance(v, tuple):
+                desc_parts.append(f"{k}_{v[0]}-{v[1]}")
+            else:
+                desc_parts.append(f"{k}_{v}")
+        if desc_parts:
+            name_parts.append("desc_" + "-".join(desc_parts[:3]))
+    
+    name_parts.append(timestamp)
+    return "_".join(name_parts) + ".m3u8"
+
+
 def render_descriptor_tab(library: MusicLibrary) -> None:
     """
     Render the Descriptor-based tab which displays library statistics and allows playlist generation
@@ -566,19 +591,30 @@ def render_descriptor_tab(library: MusicLibrary) -> None:
                             for _, row in st.session_state.filtered_tracks.iterrows()
                         ]
                         if track_list:
-                            success = create_m3u8_playlist(
-                                track_list, "descriptor_based_playlist.m3u8"
-                            )
+                            descriptor_metadata = {
+                                "method": "descriptor-based",
+                                "descriptors": {
+                                    "tempo": tempo_range,
+                                    "danceability": danceability_range,
+                                    "arousal": arousal_range,
+                                    "valence": valence_range,
+                                    "loudness": loudness_range,
+                                    "vocals": "yes" if has_vocals else "no" if has_vocals is False else "any",
+                                    "key": ','.join(selected_keys) if selected_keys else "any",
+                                    "scale": selected_scale
+                                }
+                            }
+                            playlist_name = create_playlist_name("descriptor", descriptor_metadata)
+                            success = create_m3u8_playlist(track_list, playlist_name, descriptor_metadata)
                             if success:
-                                st.success("✅ Playlist exported successfully!")
+                                st.success(f"✅ Playlist exported successfully as '{playlist_name}'!")
                             else:
-                                st.error(
-                                    "❌ No valid tracks found for playlist export."
-                                )
+                                st.error("❌ No valid tracks found for playlist export. Please adjust your filters.")
                         else:
-                            st.error("❌ No tracks to export.")
+                            st.error("❌ No tracks to export. Try adjusting your filter criteria.")
                     except Exception as e:
                         st.error(f"❌ Error exporting playlist: {str(e)}")
+
     if generate_button:
         filtered_tracks = library.filter_tracks(
             tempo_range=tempo_range,
@@ -738,21 +774,29 @@ def render_similarity_tab(library: MusicLibrary) -> None:
         # Two export buttons in separate columns:
         col_export1, col_export2 = st.columns(2)
         with col_export1:
-            if st.button("Export Discogs-Effnet Playlist 🎶", key="export_effnet"):
-                if create_m3u8_playlist(
-                    st.session_state.effnet_tracks, "similarity_effnet_playlist.m3u8"
-                ):
-                    st.success("Discogs-Effnet playlist exported successfully!")
+            if st.button("Export Discogs-Effnet Playlist 🎶", key="export_effnet", use_container_width=True):
+                metadata = {
+                    "method": "similarity-discogs-effnet",
+                    "reference_track": selected_track,
+                    "similarity_threshold": similarity_threshold / 100.0
+                }
+                playlist_name = create_playlist_name("similar_effnet", metadata)
+                if create_m3u8_playlist(st.session_state.effnet_tracks, playlist_name, metadata):
+                    st.success(f"✅ Discogs-Effnet similarity playlist exported as '{playlist_name}'!")
                 else:
-                    st.error("Export failed for Discogs-Effnet playlist.")
+                    st.error("❌ Export failed. No valid tracks found matching the similarity criteria.")
         with col_export2:
-            if st.button("Export MSD-Musicnn Playlist 🎶", key="export_musicnn"):
-                if create_m3u8_playlist(
-                    st.session_state.musicnn_tracks, "similarity_musicnn_playlist.m3u8"
-                ):
-                    st.success("MSD-Musicnn playlist exported successfully!")
+            if st.button("Export MSD-Musicnn Playlist 🎶", key="export_musicnn", use_container_width=True):
+                metadata = {
+                    "method": "similarity-msd-musicnn",
+                    "reference_track": selected_track,
+                    "similarity_threshold": similarity_threshold / 100.0
+                }
+                playlist_name = create_playlist_name("similar_musicnn", metadata)
+                if create_m3u8_playlist(st.session_state.musicnn_tracks, playlist_name, metadata):
+                    st.success(f"✅ MSD-Musicnn similarity playlist exported as '{playlist_name}'!")
                 else:
-                    st.error("Export failed for MSD-Musicnn playlist.")
+                    st.error("❌ Export failed. No valid tracks found matching the similarity criteria.")
 
         # Now display the two sets side-by-side
         col_left, col_right = st.columns(2)
@@ -806,13 +850,16 @@ def render_similarity_tab(library: MusicLibrary) -> None:
                 key="export_overlap",
                 use_container_width=True,
             ):
-                if create_m3u8_playlist(
-                    overlap_analysis["overlap_tracks"],
-                    "similarity_overlap_playlist.m3u8",
-                ):
-                    st.success("Playlist exported successfully!")
+                metadata = {
+                    "method": "similarity-overlap",
+                    "reference_track": selected_track,
+                    "similarity_threshold": similarity_threshold / 100.0
+                }
+                playlist_name = create_playlist_name("similar_overlap", metadata)
+                if create_m3u8_playlist(overlap_analysis["overlap_tracks"], playlist_name, metadata):
+                    st.success(f"✅ Overlapping similar tracks playlist exported as '{playlist_name}'!")
                 else:
-                    st.error("Playlist export failed.")
+                    st.error("❌ Export failed. No overlapping tracks found matching the similarity criteria.")
             if overlap_analysis["overlap_tracks"]:
                 st.subheader(
                     f"Tracks Found by Both Methods ({overlap_analysis['overlap_count']})"
@@ -870,10 +917,14 @@ def render_similarity_tab(library: MusicLibrary) -> None:
                     if track["track_id"] not in seen_ids:
                         seen_ids.add(track["track_id"])
                         all_tracks_combined.append(track)
-                if create_m3u8_playlist(
-                    all_tracks_combined, "similarity_all_results_playlist.m3u8"
-                ):
-                    st.success("Playlist exported successfully!")
+                metadata = {
+                    "method": "similarity-all",
+                    "reference_track": selected_track,
+                    "similarity_threshold": similarity_threshold / 100.0
+                }
+                playlist_name = create_playlist_name("similar_all", metadata)
+                if create_m3u8_playlist(all_tracks_combined, playlist_name, metadata):
+                    st.success(f"✅ Playlist exported successfully as '{playlist_name}'!")
                 else:
                     st.error("Playlist export failed.")
             st.subheader("All Results")
@@ -1032,15 +1083,20 @@ def render_genre_style_tab(library: MusicLibrary) -> None:
                         for _, row in filtered_tracks.iterrows()
                     ]
                     if track_list:
-                        success = create_m3u8_playlist(
-                            track_list, "genre_style_playlist.m3u8"
-                        )
+                        metadata = {
+                            "method": "genre-style",
+                            "genres": selected_genres,
+                            "styles": selected_styles,
+                            "descriptors": {"activation": activation_range}
+                        }
+                        playlist_name = create_playlist_name("genre_style", metadata)
+                        success = create_m3u8_playlist(track_list, playlist_name, metadata)
                         if success:
-                            st.success("✅ Playlist exported successfully!")
+                            st.success(f"✅ Genre & Style playlist exported successfully as '{playlist_name}'!")
                         else:
-                            st.error("❌ No valid tracks found for playlist export.")
+                            st.error("❌ No valid tracks found for playlist export. Please adjust your genre/style selections.")
                     else:
-                        st.error("❌ No tracks to export.")
+                        st.error("❌ No tracks to export. Try selecting different genres or styles.")
                 except Exception as e:
                     st.error(f"❌ Error exporting playlist: {str(e)}")
         st.subheader("Matching Tracks:")

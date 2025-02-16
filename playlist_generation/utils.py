@@ -1,8 +1,8 @@
 # utils.py
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
-
+from typing import Any, Dict, List, Tuple, Optional
+import pandas as pd
 import numpy as np
 import streamlit as st
 
@@ -109,13 +109,14 @@ def safe_audio_player(audio_path: str) -> None:
         st.error(f"Error playing audio: {str(e)}")
 
 
-def create_m3u8_playlist(tracks: List[Dict[str, Any]], output_path: str) -> bool:
+def create_m3u8_playlist(tracks: List[Dict[str, Any]], output_path: str, metadata: Optional[Dict[str, Any]] = None) -> bool:
     """
     Create an M3U8 playlist from a list of track dictionaries.
 
     Args:
         tracks (List[Dict[str, Any]]): List of track dictionaries.
         output_path (str): Where to save the playlist file. If relative, placed under "./playlists".
+        metadata (Optional[Dict[str, Any]]): Additional metadata to include in playlist header.
 
     Returns:
         bool: True if successful, False otherwise.
@@ -138,9 +139,56 @@ def create_m3u8_playlist(tracks: List[Dict[str, Any]], output_path: str) -> bool
     try:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write("#EXTM3U\n")
+            
+            # Write metadata as comments
+            f.write(f"#PLAYLIST-TITLE: {os.path.splitext(os.path.basename(output_path))[0]}\n")
+            f.write(f"#PLAYLIST-CREATED: {pd.Timestamp.now().isoformat()}\n")
+            f.write(f"#TRACK-COUNT: {len(valid_tracks)}\n")
+            
+            if metadata:
+                # Write generation method
+                if "method" in metadata:
+                    f.write(f"#GENERATION-METHOD: {metadata['method']}\n")
+                
+                # Write reference track if exists
+                if "reference_track" in metadata:
+                    f.write(f"#REFERENCE-TRACK: {metadata['reference_track']}\n")
+                
+                # Write genre/style filters
+                if "genres" in metadata and metadata["genres"]:
+                    f.write(f"#GENRES: {', '.join(metadata['genres'])}\n")
+                if "styles" in metadata and metadata["styles"]:
+                    f.write(f"#STYLES: {', '.join(metadata['styles'])}\n")
+                
+                # Write descriptor filters
+                if "descriptors" in metadata:
+                    for desc, value in metadata["descriptors"].items():
+                        if isinstance(value, tuple):
+                            f.write(f"#DESCRIPTOR-{desc.upper()}: {value[0]} - {value[1]}\n")
+                        else:
+                            f.write(f"#DESCRIPTOR-{desc.upper()}: {value}\n")
+                
+                # Write similarity thresholds
+                if "similarity_threshold" in metadata:
+                    f.write(f"#SIMILARITY-THRESHOLD: {metadata['similarity_threshold']}\n")
+                
+                # Add a blank line after metadata
+                f.write("\n")
+            
+            # Write track entries
             for track in valid_tracks:
-                f.write(f'#EXTINF:-1,{track["track_id"]}\n')
+                track_info = []
+                if "similarity" in track:
+                    track_info.append(f"similarity={track['similarity']:.2%}")
+                if "matched_genres" in track:
+                    track_info.append(f"genres={','.join(track['matched_genres'])}")
+                if "matched_styles" in track:
+                    track_info.append(f"styles={','.join(track['matched_styles'])}")
+                
+                info_str = " - ".join([track["track_id"]] + track_info)
+                f.write(f'#EXTINF:-1,{info_str}\n')
                 f.write(f'{track["audio_path"]}\n')
+        
         return True
     except Exception as e:
         st.error(f"Error writing playlist: {str(e)}")
