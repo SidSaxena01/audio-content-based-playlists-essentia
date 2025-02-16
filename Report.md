@@ -22,6 +22,8 @@
          - Valence and arousal data was stored in its full range [1,9].
          - For analysis and filtering, values were normalized to fall between -1 and 1.
          - This normalization enables the division of the data into four distinct quadrants, simplifying the interpretation of emotional states.
+         - A threshold of 0.8 voice probability was empirically determined to effectively distinguish between vocal and instrumental tracks, based on observations within my own music library.
+
 
    2. Statistics Overview:
       - Calculated measures (mean, median, std, variance) for audio features provide a robust quantitative overview.
@@ -52,7 +54,7 @@ Observations
    - While most features are extracted reliably, occasional misclassifications (e.g., ambiguous genre splits or key data) call for further tuning of preprocessing methods.
    - Most tracks exhibited clear tempo and loudness values with distinct genre separations.
    - Bad example: Some tracks had ambiguous key detections (e.g., inconsistent key and scale values), affecting the reliability of key profiles.
-
+   - Initially, a voice probability threshold of 0.5 was tested for vocal/instrumental classification; however, after analyzing my own music library, a threshold of 0.8 was empirically determined to be more effective, as lower probabilities resulted in numerous false positives, while the remaining false positives at 0.8 were considered outliers.
 ---
 
 # Analysis Report
@@ -131,9 +133,12 @@ Observations
 
 ## 6. **Vocal/Instrumental Balance**
 
+**Vocal/Instrumental Separation:**
+- A threshold of 0.8 voice probability was empirically determined to effectively distinguish between vocal and instrumental tracks, based on observations within my own music library.
+
 **Breakdown:**
-- **Vocal:** **68.4%**
-- **Instrumental:** **31.6%** 
+- **Vocal:** **54.1%**
+- **Instrumental:** **45.9%** 
 
 ![Vocal/Instrumental Distribution](reports/vocal-instrumental.png)
 

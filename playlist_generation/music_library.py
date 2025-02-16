@@ -170,7 +170,7 @@ class MusicLibrary:
                 & (filtered_df["tempo"] <= tempo_range[1])
             ]
         if has_vocals is not None:
-            threshold = 0.5
+            threshold = 0.8
             is_vocal = filtered_df["voice_instrumental"].apply(
                 lambda x: x["voice"] > threshold
             )
