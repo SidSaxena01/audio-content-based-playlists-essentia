@@ -92,21 +92,13 @@ def process_file(file_path, output_path, models):
         audio_loader = es.AudioLoader(filename=file_path)
         audio_stereo, sr, num_channels, _, _, _ = audio_loader()
 
-        # Resample stereo to 44.1kHz for loudness calculation
-        if sr != 44100:
-            resampler = es.Resample(inputSampleRate=sr, outputSampleRate=44100)
-            audio_stereo = resampler(audio_stereo)
-
-        # Compute loudness
-        loudness_alg = es.LoudnessEBUR128(sampleRate=44100)
+        # Compute loudness using current sample rate
+        loudness_alg = es.LoudnessEBUR128(sampleRate=sr)
         _, _, integrated_loudness, _ = loudness_alg(audio_stereo)
 
-        # Downmix to mono and resample to 44.1kHz for other features
+        # Downmix to mono
         mono_mixer = es.MonoMixer()
         audio_mono = mono_mixer(audio_stereo, num_channels)
-        if sr != 44100:
-            resampler_mono = es.Resample(inputSampleRate=sr, outputSampleRate=44100)
-            audio_mono = resampler_mono(audio_mono)
 
         # Compute tempo
         rhythm_extractor = es.RhythmExtractor2013(method="multifeature")
@@ -120,7 +112,7 @@ def process_file(file_path, output_path, models):
             keys[profile] = {"key": key, "scale": scale, "strength": float(strength)}
 
         # Resample to 16kHz for embedding models
-        resampler_16k = es.Resample(inputSampleRate=44100, outputSampleRate=16000)
+        resampler_16k = es.Resample(inputSampleRate=sr, outputSampleRate=16000)
         audio_16k = resampler_16k(audio_mono)
 
         # Compute embeddings
@@ -140,14 +132,14 @@ def process_file(file_path, output_path, models):
             for i, p in enumerate(genre_probs)
         }
 
-        sorted_indices = np.argsort(genre_probs)[::-1][:2]
-        top_genres = [
-            {
-                "genre": models["genre_metadata"]["classes"][i],
-                "probability": float(genre_probs[i]),
-            }
-            for i in sorted_indices
-        ]
+        # sorted_indices = np.argsort(genre_probs)[::-1][:2]
+        # top_genres = [
+        #     {
+        #         "genre": models["genre_metadata"]["classes"][i],
+        #         "probability": float(genre_probs[i]),
+        #     }
+        #     for i in sorted_indices
+        # ]
 
         # Voice/instrumental classification
         voice_pred = models["voice_model"](discogs_emb)
@@ -206,7 +198,7 @@ def process_task(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Parallel audio file analysis with Essentia"
+        description="Audio Files analysis with Essentia"
     )
     parser.add_argument("input_dir", help="Directory containing audio files")
     parser.add_argument("output_dir", help="Directory to save analysis results")
