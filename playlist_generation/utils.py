@@ -15,7 +15,7 @@ def get_valid_directories() -> List[Tuple[str, str]]:
     Returns:
         List[Tuple[str, str]]: A list of tuples containing a display name (with indentation) and the full path.
     """
-    project_root = Path(__file__).parent
+    project_root = Path(__file__).parent.parent
     dirs = []
     root_dirs = sorted(
         [d for d in project_root.iterdir() if d.is_dir()],
