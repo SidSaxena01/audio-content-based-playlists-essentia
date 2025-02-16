@@ -608,10 +608,10 @@ def render_genre_style_section(library: MusicLibrary):
                             st.error("❌ No tracks to export.")
                     except Exception as e:
                         st.error(f"❌ Error exporting playlist: {str(e)}")
-            
+
             # Display tracks with pagination
             st.subheader("Matching tracks:")
-            
+
             # Create column headers
             header_cols = st.columns([1, 2, 1, 1, 1])
             with header_cols[0]:
@@ -631,15 +631,15 @@ def render_genre_style_section(library: MusicLibrary):
             for track in paginated_tracks:
                 # Create row columns matching the headers
                 row_cols = st.columns([1, 2, 1, 1, 1])
-                
+
                 # Track ID column
                 with row_cols[0]:
                     st.write(f"**{track['track_id']}**")
-                
+
                 # Player column
                 with row_cols[1]:
                     safe_audio_player(track["audio_path"])
-                
+
                 # Genre, Style, and Probability columns
                 if "music_styles" in track:
                     # Build list of (genre-style, probability) tuples
@@ -667,17 +667,35 @@ def render_genre_style_section(library: MusicLibrary):
 
                     # Sort by probability in descending order
                     category_probs.sort(key=lambda x: x[2], reverse=True)
-                    
+
                     # Display all non-zero matches in the columns
                     if category_probs:
                         # Sort by probability in descending order
-                        sorted_probs = sorted(category_probs, key=lambda x: x[2], reverse=True)
+                        sorted_probs = sorted(
+                            category_probs, key=lambda x: x[2], reverse=True
+                        )
                         with row_cols[2]:
-                            st.write("\n".join([f"**{p[0]}**" for p in sorted_probs if p[2] > 0]))
+                            st.write(
+                                "\n".join(
+                                    [f"**{p[0]}**" for p in sorted_probs if p[2] > 0]
+                                )
+                            )
                         with row_cols[3]:
-                            st.write("\n".join([f"**{p[1]}**" for p in sorted_probs if p[2] > 0]))
+                            st.write(
+                                "\n".join(
+                                    [f"**{p[1]}**" for p in sorted_probs if p[2] > 0]
+                                )
+                            )
                         with row_cols[4]:
-                            st.write("\n".join([f"**{p[2]:.2f}**" for p in sorted_probs if p[2] > 0]))
+                            st.write(
+                                "\n".join(
+                                    [
+                                        f"**{p[2]:.2f}**"
+                                        for p in sorted_probs
+                                        if p[2] > 0
+                                    ]
+                                )
+                            )
 
 
 def display_descriptor_statistics(library: MusicLibrary):

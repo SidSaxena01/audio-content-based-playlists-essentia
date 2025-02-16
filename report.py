@@ -228,9 +228,7 @@ class MusicCollectionAnalyzer:
 
         # joint plot with normalized values
         plt.figure()
-        sns.jointplot(
-            x=norm_valence, y=norm_arousal, kind="hex", cmap="viridis"
-        )
+        sns.jointplot(x=norm_valence, y=norm_arousal, kind="hex", cmap="viridis")
         plt.suptitle("Valence-Arousal Emotion Space")
         plt.tight_layout()
         plt.savefig(os.path.join(self.output_dir, "emotion_space_joint.png"))

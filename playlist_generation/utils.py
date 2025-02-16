@@ -151,10 +151,10 @@ def normalize_arousal_valence(x: float) -> float:
     """
     Normalize an arousal/valence value that is ideally in the range [1, 9] to the range [-1, 1].
     If x falls outside [1, 9], it is first clipped to that range.
-    
+
     Args:
         x (float): The raw predicted value.
-    
+
     Returns:
         float: The normalized value in [-1, 1].
     """
@@ -189,9 +189,13 @@ def paginate_tracks(
         st.session_state[current_page_key] = 0
     if cols[1].button("◀", key=f"prev_{page_key}", disabled=current_page == 0):
         st.session_state[current_page_key] = max(0, current_page - 1)
-    if cols[2].button("▶", key=f"next_{page_key}", disabled=current_page >= total_pages - 1):
+    if cols[2].button(
+        "▶", key=f"next_{page_key}", disabled=current_page >= total_pages - 1
+    ):
         st.session_state[current_page_key] = min(total_pages - 1, current_page + 1)
-    if cols[3].button("▶▶", key=f"last_{page_key}", disabled=current_page >= total_pages - 1):
+    if cols[3].button(
+        "▶▶", key=f"last_{page_key}", disabled=current_page >= total_pages - 1
+    ):
         st.session_state[current_page_key] = total_pages - 1
 
     start_idx = st.session_state[current_page_key] * tracks_per_page

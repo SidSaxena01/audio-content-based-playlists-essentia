@@ -1,19 +1,18 @@
 # main.py
 import streamlit as st
 from music_library import MusicLibrary
-from ui_components import render_descriptor_tab, render_similarity_tab, render_genre_style_tab
+from ui_components import (
+    render_descriptor_tab,
+    render_genre_style_tab,
+    render_similarity_tab,
+)
 from utils import get_valid_directories, validate_directory
 
-# main.py
-import streamlit as st
-from music_library import MusicLibrary
-from ui_components import render_descriptor_tab, render_similarity_tab, render_genre_style_tab
-from utils import get_valid_directories, validate_directory
 
 def configure_library() -> tuple[str, str, bool]:
     """
     Render the library configuration section in the sidebar.
-    
+
     Returns:
         tuple[str, str, bool]: (analysis_dir, audio_dir, is_valid)
     """
@@ -23,11 +22,13 @@ def configure_library() -> tuple[str, str, bool]:
 
     # Analysis Directory Configuration
     st.sidebar.subheader("Analysis Directory")
-    use_proj_analysis = st.sidebar.checkbox("Use Project Directory", value=True, key="use_proj_analysis")
+    use_proj_analysis = st.sidebar.checkbox(
+        "Use Project Directory", value=True, key="use_proj_analysis"
+    )
     if use_proj_analysis:
         default_index = next(
             (i for i, (_, path) in enumerate(dir_options) if path.endswith("results")),
-            0
+            0,
         )
         selected_analysis = st.sidebar.selectbox(
             "Select analysis directory",
@@ -46,11 +47,12 @@ def configure_library() -> tuple[str, str, bool]:
 
     # Audio Directory Configuration
     st.sidebar.subheader("Audio Files Directory")
-    use_proj_audio = st.sidebar.checkbox("Use Project Directory", value=True, key="use_proj_audio")
+    use_proj_audio = st.sidebar.checkbox(
+        "Use Project Directory", value=True, key="use_proj_audio"
+    )
     if use_proj_audio:
         default_index = next(
-            (i for i, (_, path) in enumerate(dir_options) if "data/MusAV" in path),
-            0
+            (i for i, (_, path) in enumerate(dir_options) if "data/MusAV" in path), 0
         )
         selected_audio = st.sidebar.selectbox(
             "Select audio directory",
@@ -82,6 +84,7 @@ def configure_library() -> tuple[str, str, bool]:
 
     return analysis_dir, audio_dir, (valid_analysis and valid_audio)
 
+
 def main() -> None:
     st.set_page_config(page_title="Music Playlist Generator", layout="wide")
     st.title("Music Playlist Generator")
@@ -91,7 +94,9 @@ def main() -> None:
 
     # Prompt the user if configuration is not complete
     if not is_valid:
-        st.info("Please configure your library directories in the sidebar and ensure they are valid.")
+        st.info(
+            "Please configure your library directories in the sidebar and ensure they are valid."
+        )
         return
 
     # Provide a sidebar button to load/reload the library
@@ -99,12 +104,16 @@ def main() -> None:
         with st.spinner("Loading library..."):
             try:
                 st.session_state.library = MusicLibrary(analysis_dir, audio_dir)
-                st.sidebar.success("Library loaded successfully! Feel free to close the sidebar now.")
+                st.sidebar.success(
+                    "Library loaded successfully! Feel free to close the sidebar now."
+                )
             except Exception as e:
                 st.sidebar.error(f"Error loading library: {str(e)}")
 
     if "library" not in st.session_state or st.session_state.library is None:
-        st.info("Library not loaded. Use the sidebar configuration to load your library.")
+        st.info(
+            "Library not loaded. Use the sidebar configuration to load your library."
+        )
         return
 
     # Setup tabs for different functionalities
@@ -125,6 +134,7 @@ def main() -> None:
         render_similarity_tab(st.session_state.library)
     with tabs[2]:
         render_genre_style_tab(st.session_state.library)
+
 
 if __name__ == "__main__":
     main()

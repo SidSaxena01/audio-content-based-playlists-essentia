@@ -164,7 +164,7 @@ def process_file(file_path, output_path, models):
         va_means = va_pred.mean(axis=0)
         valence = float(va_means[0])
         arousal = float(va_means[1])
-        
+
         result = {
             "tempo": float(bpm),
             "loudness": float(integrated_loudness),

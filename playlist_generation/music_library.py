@@ -1,4 +1,3 @@
-# music_library.py
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -7,7 +6,6 @@ import numpy as np
 import pandas as pd
 import scipy.spatial.distance as distance
 import streamlit as st
-
 from utils import parse_music_style
 
 
@@ -50,7 +48,9 @@ class MusicLibrary:
         """
         self.analysis_directory = analysis_directory
         self.audio_directory = audio_directory
-        self.tracks_df: pd.DataFrame = load_tracks_data(analysis_directory, audio_directory)
+        self.tracks_df: pd.DataFrame = load_tracks_data(
+            analysis_directory, audio_directory
+        )
         self.genre_stats: Dict[str, float] = {}
         self.style_stats: Dict[str, float] = {}
         self.genre_style_map: Dict[str, set] = {}
@@ -87,7 +87,9 @@ class MusicLibrary:
         self.style_stats = style_probs
         self.genre_style_map = genre_style_map
 
-    def get_track_distribution(self, feature: str, bins: int = 10) -> Optional[Dict[str, Any]]:
+    def get_track_distribution(
+        self, feature: str, bins: int = 10
+    ) -> Optional[Dict[str, Any]]:
         """
         Get distribution statistics for a track feature.
 
@@ -140,6 +142,7 @@ class MusicLibrary:
         filtered_df = self.tracks_df.copy()
 
         if genres or styles:
+
             def match_criteria(track: pd.Series) -> bool:
                 if "music_styles" not in track:
                     return False
@@ -163,37 +166,55 @@ class MusicLibrary:
 
         if tempo_range:
             filtered_df = filtered_df[
-                (filtered_df["tempo"] >= tempo_range[0]) & (filtered_df["tempo"] <= tempo_range[1])
+                (filtered_df["tempo"] >= tempo_range[0])
+                & (filtered_df["tempo"] <= tempo_range[1])
             ]
         if has_vocals is not None:
             threshold = 0.5
-            is_vocal = filtered_df["voice_instrumental"].apply(lambda x: x["voice"] > threshold)
-            filtered_df = filtered_df[is_vocal] if has_vocals else filtered_df[~is_vocal]
+            is_vocal = filtered_df["voice_instrumental"].apply(
+                lambda x: x["voice"] > threshold
+            )
+            filtered_df = (
+                filtered_df[is_vocal] if has_vocals else filtered_df[~is_vocal]
+            )
         if danceability_range:
             filtered_df = filtered_df[
-                (filtered_df["danceability"] >= danceability_range[0]) &
-                (filtered_df["danceability"] <= danceability_range[1])
+                (filtered_df["danceability"] >= danceability_range[0])
+                & (filtered_df["danceability"] <= danceability_range[1])
             ]
         if arousal_range:
-            db_arousal_range = ((arousal_range[0] + 1) * 4 + 1, (arousal_range[1] + 1) * 4 + 1)
+            db_arousal_range = (
+                (arousal_range[0] + 1) * 4 + 1,
+                (arousal_range[1] + 1) * 4 + 1,
+            )
             filtered_df = filtered_df[
-                (filtered_df["arousal"] >= db_arousal_range[0]) & (filtered_df["arousal"] <= db_arousal_range[1])
+                (filtered_df["arousal"] >= db_arousal_range[0])
+                & (filtered_df["arousal"] <= db_arousal_range[1])
             ]
         if valence_range:
-            db_valence_range = ((valence_range[0] + 1) * 4 + 1, (valence_range[1] + 1) * 4 + 1)
+            db_valence_range = (
+                (valence_range[0] + 1) * 4 + 1,
+                (valence_range[1] + 1) * 4 + 1,
+            )
             filtered_df = filtered_df[
-                (filtered_df["valence"] >= db_valence_range[0]) & (filtered_df["valence"] <= db_valence_range[1])
+                (filtered_df["valence"] >= db_valence_range[0])
+                & (filtered_df["valence"] <= db_valence_range[1])
             ]
         if key is not None or scale is not None:
             filtered_df = filtered_df[
                 filtered_df["key"].apply(
-                    lambda x: (x[profile]["key"] in key if key is not None else True) and
-                              (x[profile]["scale"].lower() == scale.lower() if scale is not None else True)
+                    lambda x: (x[profile]["key"] in key if key is not None else True)
+                    and (
+                        x[profile]["scale"].lower() == scale.lower()
+                        if scale is not None
+                        else True
+                    )
                 )
             ]
         if loudness_range:
             filtered_df = filtered_df[
-                (filtered_df["loudness"] >= loudness_range[0]) & (filtered_df["loudness"] <= loudness_range[1])
+                (filtered_df["loudness"] >= loudness_range[0])
+                & (filtered_df["loudness"] <= loudness_range[1])
             ]
         return filtered_df
 
@@ -214,19 +235,25 @@ class MusicLibrary:
         Returns:
             List[Dict[str, Any]]: List of similar track dictionaries.
         """
-        query_track = self.tracks_df[self.tracks_df["track_id"] == query_track_id].iloc[0]
+        query_track = self.tracks_df[self.tracks_df["track_id"] == query_track_id].iloc[
+            0
+        ]
         query_embedding = np.array(query_track["embeddings"][embedding_type])
         similarities = []
         for _, track in self.tracks_df.iterrows():
             if track["track_id"] != query_track_id:
                 track_embedding = np.array(track["embeddings"][embedding_type])
                 similarity = 1 - distance.cosine(query_embedding, track_embedding)
-                similarities.append({
-                    "track_id": track["track_id"],
-                    "audio_path": track["audio_path"],
-                    "similarity": similarity,
-                })
-        return sorted(similarities, key=lambda x: x["similarity"], reverse=True)[:n_results]
+                similarities.append(
+                    {
+                        "track_id": track["track_id"],
+                        "audio_path": track["audio_path"],
+                        "similarity": similarity,
+                    }
+                )
+        return sorted(similarities, key=lambda x: x["similarity"], reverse=True)[
+            :n_results
+        ]
 
     def get_genre_style_recommendations(
         self,
@@ -266,15 +293,27 @@ class MusicLibrary:
                     track_genres.add(parent)
                 if not selected_styles or style in selected_styles:
                     track_styles.add(style)
-            genre_sim = (len(input_genres & track_genres) / len(input_genres | track_genres)) if input_genres else 0
-            style_sim = (len(input_styles & track_styles) / len(input_styles | track_styles)) if input_styles else 0
+            genre_sim = (
+                (len(input_genres & track_genres) / len(input_genres | track_genres))
+                if input_genres
+                else 0
+            )
+            style_sim = (
+                (len(input_styles & track_styles) / len(input_styles | track_styles))
+                if input_styles
+                else 0
+            )
             similarity = (genre_sim + style_sim) / 2
             if similarity > 0:
-                recommendations.append({
-                    "track_id": track["track_id"],
-                    "audio_path": track["audio_path"],
-                    "similarity": similarity,
-                    "matched_genres": list(track_genres),
-                    "matched_styles": list(track_styles),
-                })
-        return sorted(recommendations, key=lambda x: x["similarity"], reverse=True)[:n_recommendations]
+                recommendations.append(
+                    {
+                        "track_id": track["track_id"],
+                        "audio_path": track["audio_path"],
+                        "similarity": similarity,
+                        "matched_genres": list(track_genres),
+                        "matched_styles": list(track_styles),
+                    }
+                )
+        return sorted(recommendations, key=lambda x: x["similarity"], reverse=True)[
+            :n_recommendations
+        ]
