@@ -9,6 +9,9 @@ import essentia.standard as es
 import numpy as np
 from tqdm import tqdm
 
+# Global variable to hold models in each worker
+models_global = None
+
 
 def load_models(models_dir):
     """Load all required Essentia models and metadata."""
@@ -188,10 +191,6 @@ def process_file(file_path, output_path, models):
             f"Error processing {file_path} in {current_process().name}: {str(e)}"
         )
         return False
-
-
-# Global variable to hold models in each worker
-models_global = None
 
 
 def worker_initializer(models_dir):
