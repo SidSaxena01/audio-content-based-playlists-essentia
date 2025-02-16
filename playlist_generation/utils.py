@@ -147,6 +147,21 @@ def create_m3u8_playlist(tracks: List[Dict[str, Any]], output_path: str) -> bool
         return False
 
 
+def normalize_arousal_valence(x: float) -> float:
+    """
+    Normalize an arousal/valence value that is ideally in the range [1, 9] to the range [-1, 1].
+    If x falls outside [1, 9], it is first clipped to that range.
+    
+    Args:
+        x (float): The raw predicted value.
+    
+    Returns:
+        float: The normalized value in [-1, 1].
+    """
+    clipped = max(min(x, 9), 1)
+    return (clipped - 1) / 4 - 1
+
+
 def paginate_tracks(
     tracks_data: List[Dict[str, Any]], page_key: str, tracks_per_page: int = 10
 ) -> List[Dict[str, Any]]:

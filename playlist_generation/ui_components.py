@@ -1,9 +1,10 @@
 # ui_components.py
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 # ui_components.py
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 from music_library import MusicLibrary
 from utils import (
@@ -11,7 +12,70 @@ from utils import (
     paginate_tracks,
     parse_music_style,
     safe_audio_player,
+    normalize_arousal_valence
 )
+
+
+def reset_descriptor_filters() -> None:
+    """
+    Reset all descriptor filters to their default values by updating st.session_state.
+    """
+    st.session_state.tempo_range = (60, 180)
+    st.session_state.danceability_range = (0.0, 1.0)
+    st.session_state.arousal_range = (-1.0, 1.0)
+    st.session_state.valence_range = (-1.0, 1.0)
+    st.session_state.loudness_range = (-30.0, -10.0)
+    st.session_state.has_vocals = None
+    st.session_state.selected_keys = []
+    st.session_state.selected_scale = "Any"
+
+
+def plot_valence_arousal_range(valence_range: Tuple[float, float], arousal_range: Tuple[float, float]) -> go.Figure:
+    """
+    Create an XY plot for valence (x-axis) and arousal (y-axis) with four quadrants.
+    A dashed line is drawn at x=0 and y=0 to indicate quadrant boundaries.
+    The currently selected range is highlighted as a semi-transparent green rectangle.
+
+    Args:
+        valence_range (Tuple[float, float]): The selected (min, max) valence values.
+        arousal_range (Tuple[float, float]): The selected (min, max) arousal values.
+
+    Returns:
+        go.Figure: A Plotly figure with the plotted quadrants and highlighted selection.
+    """
+    fig = go.Figure()
+
+    # Draw quadrant dividing lines at 0
+    fig.add_shape(
+        type="line", x0=-1, x1=1, y0=0, y1=0,
+        line=dict(color="black", dash="dash")
+    )
+    fig.add_shape(
+        type="line", x0=0, x1=0, y0=-1, y1=1,
+        line=dict(color="black", dash="dash")
+    )
+
+    # Add rectangle highlighting the selected range
+    fig.add_shape(
+        type="rect",
+        x0=valence_range[0],
+        y0=arousal_range[0],
+        x1=valence_range[1],
+        y1=arousal_range[1],
+        fillcolor="rgba(0,128,0,0.3)",
+        line=dict(color="green"),
+    )
+
+    # Set layout and axes properties
+    fig.update_layout(
+        xaxis=dict(range=[-1, 1], title="Valence"),
+        yaxis=dict(range=[-1, 1], title="Arousal"),
+        margin=dict(l=20, r=20, t=20, b=20),
+        width=300,
+        height=300,
+        title="Valence-Arousal Range"
+    )
+    return fig
 
 
 def display_descriptor_statistics(library: MusicLibrary) -> None:
@@ -27,8 +91,8 @@ def display_descriptor_statistics(library: MusicLibrary) -> None:
     descriptors = [
         ("tempo", None),
         ("danceability", None),
-        ("arousal", lambda x: (x - 1) / 4 - 1),
-        ("valence", lambda x: (x - 1) / 4 - 1),
+        ("arousal", normalize_arousal_valence),
+        ("valence", normalize_arousal_valence),
         ("loudness", None),
         ("voice_prob", None),
     ]
@@ -96,8 +160,8 @@ def compute_track_statistics(tracks_df: pd.DataFrame) -> Dict[str, Any]:
     descriptors = {
         "tempo": {"label": "Tempo (BPM)", "normalize": None},
         "danceability": {"label": "Danceability", "normalize": None},
-        "arousal": {"label": "Arousal", "normalize": lambda x: (x - 1) / 4 - 1},
-        "valence": {"label": "Valence", "normalize": lambda x: (x - 1) / 4 - 1},
+        "arousal": {"label": "Arousal", "normalize": normalize_arousal_valence},
+        "valence": {"label": "Valence", "normalize": normalize_arousal_valence},
         "loudness": {"label": "Loudness (dB)", "normalize": None},
         "voice_prob": {
             "label": "Voice Probability",
@@ -334,49 +398,73 @@ def render_descriptor_tab(library: MusicLibrary) -> None:
         st.session_state.filtered_tracks = None
     if "current_page" not in st.session_state:
         st.session_state.current_page = 0
+    
+    # Ensure session state values exist so that the reset button can update them
+    if "tempo_range" not in st.session_state:
+        st.session_state.tempo_range = (60, 180)
+    if "danceability_range" not in st.session_state:
+        st.session_state.danceability_range = (0.0, 1.0)
+    if "arousal_range" not in st.session_state:
+        st.session_state.arousal_range = (-1.0, 1.0)
+    if "valence_range" not in st.session_state:
+        st.session_state.valence_range = (-1.0, 1.0)
+    if "loudness_range" not in st.session_state:
+        st.session_state.loudness_range = (-30.0, -10.0)
+    if "has_vocals" not in st.session_state:
+        st.session_state.has_vocals = None
+    if "selected_keys" not in st.session_state:
+        st.session_state.selected_keys = []
+    if "selected_scale" not in st.session_state:
+        st.session_state.selected_scale = "Any"
 
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col1:
-        st.subheader("Rhythm & Movement")
-        tempo_range = st.slider(
-            "Tempo Range (BPM)", min_value=0, max_value=200, value=(60, 180)
-        )
-        danceability_range = st.slider(
-            "Danceability", min_value=0.0, max_value=1.0, value=(0.0, 1.0)
-        )
-    with col2:
-        st.subheader("Mood & Energy")
-        arousal_range = st.slider(
-            "Arousal (Energy)", min_value=-1.0, max_value=1.0, value=(-1.0, 1.0)
-        )
-        valence_range = st.slider(
-            "Valence (Mood)", min_value=-1.0, max_value=1.0, value=(-1.0, 1.0)
-        )
-    with col3:
+        # Row 1: Rhythm & Movement
+    st.subheader("Rhythm & Movement")
+    col_rm1, col_rm2 = st.columns(2)
+    with col_rm1:
+        tempo_range = st.slider("Tempo Range (BPM)", 0, 200, st.session_state.tempo_range, key="tempo_range")
+    with col_rm2:
+        danceability_range = st.slider("Danceability", 0.0, 1.0, st.session_state.danceability_range, key="danceability_range")
+
+    # Row 2: Mood & Energy with sliders and quadrant plot side by side
+    st.subheader("Mood & Energy")
+    col_me_left, col_me_right = st.columns([1, 1])
+    with col_me_left:
+        arousal_range = st.slider("Arousal (Energy)", -1.0, 1.0, st.session_state.arousal_range, key="arousal_range")
+        valence_range = st.slider("Valence (Mood)", -1.0, 1.0, st.session_state.valence_range, key="valence_range")
+    with col_me_right:
+        # Display the valence-arousal quadrant plot to the right of the sliders.
+        from ui_components import plot_valence_arousal_range  # Ensure this function is imported
+        fig = plot_valence_arousal_range(valence_range, arousal_range)
+        st.plotly_chart(fig, use_container_width=True)
+
+    
+    # Row 3: Additional Filters - Musical Key, Sound & Voice, and Reset Filters
+    st.subheader("Additional Filters")
+    col_key, col_sv, col_reset = st.columns([1, 1, 0.5])
+    with col_key:
+        st.subheader("Musical Key")
+        key_options = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+        selected_keys = st.multiselect("Key", options=key_options, key="selected_keys")
+        key_filter = selected_keys if selected_keys else None
+        scale_options = ["major", "minor"]
+        selected_scale = st.selectbox("Scale", ["Any"] + scale_options, key="selected_scale")
+        scale_filter = selected_scale if selected_scale != "Any" else None
+
+    with col_sv:
         st.subheader("Sound & Voice")
-        loudness_range = st.slider(
-            "Loudness Range (dB)", min_value=-60.0, max_value=0.0, value=(-30.0, -10.0)
-        )
         has_vocals = st.radio(
             "Vocal Content",
             [None, True, False],
-            format_func=lambda x: "Any"
-            if x is None
-            else "With Vocals"
-            if x
-            else "Instrumental",
+            format_func=lambda x: "Any" if x is None else "With Vocals" if x else "Instrumental",
+            key="has_vocals"
         )
-    st.subheader("Musical Key")
-    key_col1, key_col2, _ = st.columns([1, 1, 2])
-    with key_col1:
-        key_options = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-        selected_keys = st.multiselect("Key", options=key_options)
-        key_filter = selected_keys if selected_keys else None
-    with key_col2:
-        scale_options = ["major", "minor"]
-        selected_scale = st.selectbox("Scale", ["Any"] + scale_options)
-        scale_filter = selected_scale if selected_scale != "Any" else None
+        loudness_range = st.slider("Loudness Range (dB)", -60.0, 0.0, st.session_state.loudness_range, key="loudness_range")
 
+    with col_reset:
+        if st.button("Reset Filters", key="reset_filters", on_click=reset_descriptor_filters):
+            st.rerun()
+            
+                    
     button_cols = st.columns([1.5, 0.5, 2])
     with button_cols[0]:
         col_btn1, col_btn2 = st.columns([2, 1])
