@@ -1,5 +1,7 @@
 # Essentia Playlists Analysis
 
+[Repo - https://github.com/SidSaxena01/audio-content-based-playlists-essentia](https://github.com/SidSaxena01/audio-content-based-playlists-essentia)
+
 ## Overview
 - Analyze a music collection (using the MusAV dataset) to extract audio descriptors such as tempo, key, loudness, embeddings, music styles, voice/instrumental classification, danceability, and emotion (arousal/valence) using Essentia.
 - Generate statistical reports and visualizations on these features (e.g. distributions of music styles, tempo, loudness, keys, and emotion space).
