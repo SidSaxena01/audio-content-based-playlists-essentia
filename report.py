@@ -115,7 +115,7 @@ class MusicCollectionAnalyzer:
 
         plt.figure()
         top_parents.sort_values().plot(kind="barh")
-        plt.title("Top 20 Parent Genre Distribution")
+        plt.title("Parent Genre Distribution")
         plt.xlabel("Weighted Proportion")
         plt.ylabel("Genre Category")
         plt.tight_layout()
