@@ -554,7 +554,7 @@ def render_descriptor_tab(library: MusicLibrary) -> None:
     with button_cols[2]:
         if st.session_state.filtered_tracks is not None:
             if st.button(
-                "Export as M3U8", key="export_descriptor", use_container_width=True
+                "Export as M3U8 🎵", key="export_descriptor", use_container_width=True
             ):
                 with st.spinner("Creating playlist file..."):
                     try:
@@ -619,7 +619,12 @@ def render_similarity_tab(library: MusicLibrary) -> None:
     Each sub-tab includes an export button that exports only the tracks shown in that tab.
     """
     st.header("Generate Playlist by Track Similarity")
-    search_query = st.text_input("Search for reference track", value="")
+
+    # Create a single row with three columns for search, select, and player
+    search_col, select_col, player_col = st.columns([1, 2, 1])
+
+    with search_col:
+        search_query = st.text_input("Search for reference track", value="")
 
     def get_track_label(track: dict) -> str:
         label = track["track_id"][:8]
@@ -644,15 +649,19 @@ def render_similarity_tab(library: MusicLibrary) -> None:
         filtered_tracks = all_tracks
     options = [(get_track_label(track), track["track_id"]) for track in filtered_tracks]
     options.sort(key=lambda x: x[0])
-    selected_label, selected_track = st.selectbox(
-        "Select a reference track", options, format_func=lambda opt: opt[0]
-    )
+
+    with select_col:
+        selected_label, selected_track = st.selectbox(
+            "Select a reference track", options, format_func=lambda opt: opt[0]
+        )
+
     selected_track_info = library.tracks_df[
         library.tracks_df["track_id"] == selected_track
     ].iloc[0]
 
-    st.subheader("Reference Track")
-    safe_audio_player(selected_track_info["audio_path"])
+    with player_col:
+        st.write("Reference Track")
+        safe_audio_player(selected_track_info["audio_path"])
 
     # Display some basic descriptor stats for the reference track.
     try:
@@ -729,7 +738,7 @@ def render_similarity_tab(library: MusicLibrary) -> None:
         # Two export buttons in separate columns:
         col_export1, col_export2 = st.columns(2)
         with col_export1:
-            if st.button("Export Discogs-Effnet Playlist", key="export_effnet"):
+            if st.button("Export Discogs-Effnet Playlist 🎶", key="export_effnet"):
                 if create_m3u8_playlist(
                     st.session_state.effnet_tracks, "similarity_effnet_playlist.m3u8"
                 ):
@@ -737,7 +746,7 @@ def render_similarity_tab(library: MusicLibrary) -> None:
                 else:
                     st.error("Export failed for Discogs-Effnet playlist.")
         with col_export2:
-            if st.button("Export MSD-Musicnn Playlist", key="export_musicnn"):
+            if st.button("Export MSD-Musicnn Playlist 🎶", key="export_musicnn"):
                 if create_m3u8_playlist(
                     st.session_state.musicnn_tracks, "similarity_musicnn_playlist.m3u8"
                 ):
@@ -754,13 +763,17 @@ def render_similarity_tab(library: MusicLibrary) -> None:
                     st.session_state.effnet_tracks, "effnet"
                 )
                 for track in paginated_effnet:
-                    similarity_text = f"{track['similarity']:.0%}"
+                    similarity_text = f"<span style='font-size:24px; font-weight:bold'>{track['similarity']:.0%}</span>"
                     if track.get("below_threshold", False):
-                        st.write(
-                            f"**{track['track_id']}** ({similarity_text}) :warning: *Below threshold*"
+                        st.markdown(
+                            f"**{track['track_id']}** ({similarity_text}) :warning: *Below threshold*",
+                            unsafe_allow_html=True,
                         )
                     else:
-                        st.write(f"**{track['track_id']}** ({similarity_text})")
+                        st.markdown(
+                            f"**{track['track_id']}** ({similarity_text})",
+                            unsafe_allow_html=True,
+                        )
                     safe_audio_player(track["audio_path"])
             else:
                 st.write("No matches found.")
@@ -771,20 +784,28 @@ def render_similarity_tab(library: MusicLibrary) -> None:
                     st.session_state.musicnn_tracks, "musicnn"
                 )
                 for track in paginated_musicnn:
-                    similarity_text = f"{track['similarity']:.0%}"
+                    similarity_text = f"<span style='font-size:24px; font-weight:bold'>{track['similarity']:.0%}</span>"
                     if track.get("below_threshold", False):
-                        st.write(
-                            f"**{track['track_id']}** ({similarity_text}) :warning: *Below threshold*"
+                        st.markdown(
+                            f"**{track['track_id']}** ({similarity_text}) :warning: *Below threshold*",
+                            unsafe_allow_html=True,
                         )
                     else:
-                        st.write(f"**{track['track_id']}** ({similarity_text})")
+                        st.markdown(
+                            f"**{track['track_id']}** ({similarity_text})",
+                            unsafe_allow_html=True,
+                        )
                     safe_audio_player(track["audio_path"])
             else:
                 st.write("No matches found.")
 
         # Sub-tab 2: Overlapping Tracks
         with result_tabs[1]:
-            if st.button("Export Overlapping Playlist", key="export_overlap"):
+            if st.button(
+                "Export Overlapping Playlist 🎧",
+                key="export_overlap",
+                use_container_width=True,
+            ):
                 if create_m3u8_playlist(
                     overlap_analysis["overlap_tracks"],
                     "similarity_overlap_playlist.m3u8",
@@ -796,28 +817,51 @@ def render_similarity_tab(library: MusicLibrary) -> None:
                 st.subheader(
                     f"Tracks Found by Both Methods ({overlap_analysis['overlap_count']})"
                 )
+
+                # Add column headers
+                col1, col2, col3 = st.columns([1, 1, 2])
+                with col1:
+                    st.subheader("Track ID")
+                with col2:
+                    st.subheader("Track Preview")
+                with col3:
+                    st.subheader("Similarities")
+
                 paginated_overlap = paginate_tracks(
                     overlap_analysis["overlap_tracks"], "overlap"
                 )
                 for track in paginated_overlap:
-                    col1, col2 = st.columns([2, 1])
+                    col1, col2, col3 = st.columns([1, 1, 2])
                     with col1:
-                        safe_audio_player(track["audio_path"])
-                    with col2:
                         st.write(f"**{track['track_id']}**")
-                        st.write(f"Effnet similarity: {track['effnet_similarity']:.0%}")
-                        st.write(
-                            f"Musicnn similarity: {track['musicnn_similarity']:.0%}"
+                    with col2:
+                        safe_audio_player(track["audio_path"])
+                    with col3:
+                        similarity_text_effnet = f"<span style='font-size:24px; font-weight:bold'>{track['effnet_similarity']:.0%}</span>"
+                        similarity_text_musicnn = f"<span style='font-size:24px; font-weight:bold'>{track['musicnn_similarity']:.0%}</span>"
+                        similarity_text_avg = f"<span style='font-size:24px; font-weight:bold'>{track['avg_similarity']:.0%}</span>"
+
+                        # Add below threshold text if average similarity is below threshold
+                        threshold = similarity_threshold / 100.0
+                        below_threshold = track["avg_similarity"] < threshold
+                        threshold_text = (
+                            " :warning: *Below threshold*" if below_threshold else ""
                         )
-                        st.write(f"Average similarity: {track['avg_similarity']:.0%}")
-                        if track.get("below_threshold", False):
-                            st.write(":warning: *Below threshold*")
+
+                        st.markdown(
+                            f"Effnet: {similarity_text_effnet} / Musicnn: {similarity_text_musicnn} / Average: {similarity_text_avg} {threshold_text}",
+                            unsafe_allow_html=True,
+                        )
             else:
                 st.write("No overlapping tracks found.")
 
         # Sub-tab 3: All Results
         with result_tabs[2]:
-            if st.button("Export All Results Playlist", key="export_all"):
+            if st.button(
+                "Export All Results Playlist 🎼",
+                key="export_all",
+                use_container_width=True,
+            ):
                 all_tracks_combined = []
                 seen_ids = set()
                 for track in (
@@ -842,12 +886,21 @@ def render_similarity_tab(library: MusicLibrary) -> None:
                     seen_ids.add(track["track_id"])
                     all_tracks_combined.append(track)
             paginated_all = paginate_tracks(all_tracks_combined, "all")
+            col1, col2, col3 = st.columns([1, 1, 1])
+            with col1:
+                st.subheader("Track ID")
+            with col2:
+                st.subheader("Preview")
+            with col3:
+                st.subheader("Found by")
+
             for track in paginated_all:
-                col1, col2 = st.columns([2, 1])
+                col1, col2, col3 = st.columns([1, 1, 1])
                 with col1:
-                    safe_audio_player(track["audio_path"])
-                with col2:
                     st.write(f"**{track['track_id']}**")
+                with col2:
+                    safe_audio_player(track["audio_path"])
+                with col3:
                     found_in = []
                     if any(
                         t["track_id"] == track["track_id"]
@@ -859,203 +912,7 @@ def render_similarity_tab(library: MusicLibrary) -> None:
                         for t in st.session_state.musicnn_tracks
                     ):
                         found_in.append("Musicnn")
-                    st.write(f"Found by: {', '.join(found_in)}")
-
-
-# def render_similarity_tab(library: MusicLibrary) -> None:
-#     """
-#     Render the Similarity-based tab which allows the user to find tracks similar to a reference track.
-#     """
-#     st.header("Generate Playlist by Track Similarity")
-#     search_query = st.text_input("Search for reference track", value="")
-
-#     def get_track_label(track: dict) -> str:
-#         label = track["track_id"][:8]
-#         if "music_styles" in track:
-#             top_styles = sorted(
-#                 track["music_styles"].items(), key=lambda item: item[1], reverse=True
-#             )[:1]
-#             if top_styles:
-#                 style_key, _ = top_styles[0]
-#                 label += f" ({parse_music_style(style_key)[0]})"
-#         return label
-
-#     all_tracks = library.tracks_df.to_dict("records")
-#     filtered_tracks = [
-#         track
-#         for track in all_tracks
-#         if search_query.lower() in track["track_id"].lower()
-#         or search_query.lower() in get_track_label(track).lower()
-#     ]
-#     if not search_query or not filtered_tracks:
-#         filtered_tracks = all_tracks
-#     options = [(get_track_label(track), track["track_id"]) for track in filtered_tracks]
-#     options.sort(key=lambda x: x[0])
-#     selected_label, selected_track = st.selectbox(
-#         "Select a reference track", options, format_func=lambda opt: opt[0]
-#     )
-#     selected_track_info = library.tracks_df[
-#         library.tracks_df["track_id"] == selected_track
-#     ].iloc[0]
-#     st.subheader("Reference Track")
-#     safe_audio_player(selected_track_info["audio_path"])
-
-#     try:
-#         descriptor_stats = compute_track_statistics(
-#             library.tracks_df[library.tracks_df["track_id"] == selected_track]
-#         )
-#     except Exception:
-#         descriptor_stats = None
-#     cols = st.columns(4)
-#     if descriptor_stats:
-#         for idx, (desc, data) in enumerate(descriptor_stats.items()):
-#             with cols[idx % 4]:
-#                 if desc == "key":
-#                     key_info = selected_track_info["key"]["temperley"]
-#                     st.caption(data["label"])
-#                     st.subheader(f"{key_info['key']} {key_info['scale']}")
-#                 elif desc == "voice_prob":
-#                     st.caption(data["label"])
-#                     st.subheader(
-#                         f"{selected_track_info['voice_instrumental']['voice']:.2f}"
-#                     )
-#                 else:
-#                     st.caption(data["label"])
-#                     st.subheader(f"{data['mean']:.2f}")
-
-#     similarity_threshold = st.slider(
-#         "Minimum Similarity (%)", min_value=0, max_value=100, value=50
-#     )
-#     max_results = st.slider(
-#         "Number of similar tracks to show", min_value=10, max_value=20, value=10
-#     )
-#     if st.button("Find Similar Tracks"):
-#         effnet_tracks = library.find_similar_tracks(
-#             selected_track, "discogs-effnet", n_results=max(10, max_results)
-#         )
-#         musicnn_tracks = library.find_similar_tracks(
-#             selected_track, "msd-musicnn", n_results=max(10, max_results)
-#         )
-#         threshold = similarity_threshold / 100.0
-#         effnet_matched = [
-#             {**t, "below_threshold": t["similarity"] < threshold}
-#             for t in effnet_tracks[:max_results]
-#         ]
-#         musicnn_matched = [
-#             {**t, "below_threshold": t["similarity"] < threshold}
-#             for t in musicnn_tracks[:max_results]
-#         ]
-#         st.session_state.effnet_tracks = effnet_matched
-#         st.session_state.musicnn_tracks = musicnn_matched
-
-#     if hasattr(st.session_state, "effnet_tracks"):
-#         st.markdown("## Results Analysis")
-#         overlap_analysis = analyze_similarity_overlap(
-#             st.session_state.effnet_tracks, st.session_state.musicnn_tracks
-#         )
-#         stats_cols = st.columns(4)
-#         stats_cols[0].metric(
-#             "Total Effnet Results", len(st.session_state.effnet_tracks)
-#         )
-#         stats_cols[1].metric(
-#             "Total Musicnn Results", len(st.session_state.musicnn_tracks)
-#         )
-#         stats_cols[2].metric("Overlapping Results", overlap_analysis["overlap_count"])
-#         stats_cols[3].metric(
-#             "Overlap Percentage",
-#             f"{(overlap_analysis['overlap_count'] * 100 / max(len(st.session_state.effnet_tracks), 1)):.1f}%",
-#         )
-#         result_tabs = st.tabs(
-#             ["Side-by-Side Comparison", "Overlapping Tracks", "All Results"]
-#         )
-#         with result_tabs[0]:
-#             col_left, col_right = st.columns(2)
-#             with col_left:
-#                 st.subheader("Discogs-Effnet Results")
-#                 if st.session_state.effnet_tracks:
-#                     paginated_effnet = paginate_tracks(
-#                         st.session_state.effnet_tracks, "effnet"
-#                     )
-#                     for track in paginated_effnet:
-#                         similarity_text = f"{track['similarity']:.0%}"
-#                         if track.get("below_threshold", False):
-#                             st.write(
-#                                 f"**{track['track_id']}** ({similarity_text}) :warning: *Below threshold*"
-#                             )
-#                         else:
-#                             st.write(f"**{track['track_id']}** ({similarity_text})")
-#                         safe_audio_player(track["audio_path"])
-#                 else:
-#                     st.write("No matches found.")
-#             with col_right:
-#                 st.subheader("MSD-Musicnn Results")
-#                 if st.session_state.musicnn_tracks:
-#                     paginated_musicnn = paginate_tracks(
-#                         st.session_state.musicnn_tracks, "musicnn"
-#                     )
-#                     for track in paginated_musicnn:
-#                         similarity_text = f"{track['similarity']:.0%}"
-#                         if track.get("below_threshold", False):
-#                             st.write(
-#                                 f"**{track['track_id']}** ({similarity_text}) :warning: *Below threshold*"
-#                             )
-#                         else:
-#                             st.write(f"**{track['track_id']}** ({similarity_text})")
-#                         safe_audio_player(track["audio_path"])
-#                 else:
-#                     st.write("No matches found.")
-#         with result_tabs[1]:
-#             if overlap_analysis["overlap_tracks"]:
-#                 st.subheader(
-#                     f"Tracks Found by Both Methods ({overlap_analysis['overlap_count']})"
-#                 )
-#                 paginated_overlap = paginate_tracks(
-#                     overlap_analysis["overlap_tracks"], "overlap"
-#                 )
-#                 for track in paginated_overlap:
-#                     col1, col2 = st.columns([2, 1])
-#                     with col1:
-#                         safe_audio_player(track["audio_path"])
-#                     with col2:
-#                         st.write(f"**{track['track_id']}**")
-#                         st.write(f"Effnet similarity: {track['effnet_similarity']:.0%}")
-#                         st.write(
-#                             f"Musicnn similarity: {track['musicnn_similarity']:.0%}"
-#                         )
-#                         st.write(f"Average similarity: {track['avg_similarity']:.0%}")
-#                         if track.get("below_threshold", False):
-#                             st.write(":warning: *Below threshold*")
-#             else:
-#                 st.write("No overlapping tracks found.")
-#         with result_tabs[2]:
-#             st.subheader("All Results")
-#             all_tracks_combined = []
-#             seen_ids = set()
-#             for track in (
-#                 st.session_state.effnet_tracks + st.session_state.musicnn_tracks
-#             ):
-#                 if track["track_id"] not in seen_ids:
-#                     seen_ids.add(track["track_id"])
-#                     all_tracks_combined.append(track)
-#             paginated_all = paginate_tracks(all_tracks_combined, "all")
-#             for track in paginated_all:
-#                 col1, col2 = st.columns([2, 1])
-#                 with col1:
-#                     safe_audio_player(track["audio_path"])
-#                 with col2:
-#                     st.write(f"**{track['track_id']}**")
-#                     found_in = []
-#                     if any(
-#                         t["track_id"] == track["track_id"]
-#                         for t in st.session_state.effnet_tracks
-#                     ):
-#                         found_in.append("Effnet")
-#                     if any(
-#                         t["track_id"] == track["track_id"]
-#                         for t in st.session_state.musicnn_tracks
-#                     ):
-#                         found_in.append("Musicnn")
-#                     st.write(f"Found by: {', '.join(found_in)}")
+                    st.write(f"{', '.join(found_in)}")
 
 
 def render_genre_style_tab(library: MusicLibrary) -> None:
@@ -1164,7 +1021,7 @@ def render_genre_style_tab(library: MusicLibrary) -> None:
         ]
         st.subheader(f"Found {len(filtered_tracks)} matching tracks")
         if st.button(
-            "Export as M3U8", key="export_genre_style", use_container_width=True
+            "Export as M3U8 🎷", key="export_genre_style", use_container_width=True
         ):
             from utils import create_m3u8_playlist
 
