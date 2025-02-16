@@ -15,6 +15,55 @@ from utils import (
     normalize_arousal_valence
 )
 
+def plot_three_key_distributions(filtered_df: pd.DataFrame) -> px.bar:
+    """
+    Create a grouped bar chart comparing key distributions from three algorithms:
+    Temperley, EDMA, and Krumhansl.
+
+    Args:
+        filtered_df (pd.DataFrame): DataFrame of filtered tracks. Each row should have a "key"
+                                    column which is a dictionary with entries for
+                                    "temperley", "edma", and "krumhansl".
+
+    Returns:
+        A Plotly Express figure with grouped bars.
+    """
+    algorithms = ["temperley", "edma", "krumhansl"]
+    data = []
+    
+    for algo in algorithms:
+        # Extract the key for each algorithm from the "key" column.
+        # If a track does not have a value for the algorithm, it will be ignored.
+        counts = (
+            filtered_df["key"]
+            .dropna()
+            .apply(lambda x: x.get(algo, {}).get("key") if isinstance(x, dict) else None)
+            .dropna()
+            .value_counts()
+        )
+        for k, count in counts.items():
+            data.append({
+                "Algorithm": algo.capitalize(),  # Capitalize for nicer labels
+                "Key": k,
+                "Count": count
+            })
+            
+    if not data:
+        st.warning("No key distribution data available.")
+        return px.bar(title="Key Distribution Comparison Across Algorithms")
+    
+    df_plot = pd.DataFrame(data)
+    fig = px.bar(
+        df_plot,
+        x="Key",
+        y="Count",
+        color="Algorithm",
+        barmode="group",
+        title="Key Distribution Comparison Across Algorithms"
+    )
+    fig.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+    return fig
+
 
 def reset_descriptor_filters() -> None:
     """
@@ -196,13 +245,10 @@ def compute_track_statistics(tracks_df: pd.DataFrame) -> Dict[str, Any]:
         stats["key"] = {"label": "Key Distribution", "values": key_counts.to_dict()}
     return stats
 
-
 def display_summary_stats(tracks_df: pd.DataFrame) -> None:
     """
-    Display summary statistics and distribution plots for tracks.
-
-    Args:
-        tracks_df (pd.DataFrame): DataFrame of tracks.
+    Display summary statistics, distributions, and a combined key distribution plot
+    for the matched tracks (filtered by your descriptor-based filters).
     """
     if tracks_df.empty:
         return
@@ -214,22 +260,16 @@ def display_summary_stats(tracks_df: pd.DataFrame) -> None:
         if desc != "key":
             row = {"Descriptor": data["label"]}
             if "mean" in data:
-                row.update(
-                    {
-                        "Mean": f"{data['mean']:.2f}",
-                        "Std": f"{data['std']:.2f}",
-                        "Min": f"{data['min']:.2f}",
-                        "Max": f"{data['max']:.2f}",
-                        "Median": f"{data['median']:.2f}",
-                    }
-                )
+                row.update({
+                    "Mean": f"{data['mean']:.2f}",
+                    "Std": f"{data['std']:.2f}",
+                    "Min": f"{data['min']:.2f}",
+                    "Max": f"{data['max']:.2f}",
+                    "Median": f"{data['median']:.2f}",
+                })
                 stats_data.append(row)
     if stats_data:
-        st.dataframe(
-            pd.DataFrame(stats_data).set_index("Descriptor"),
-            hide_index=False,
-            use_container_width=True,
-        )
+        st.dataframe(pd.DataFrame(stats_data).set_index("Descriptor"), hide_index=False, use_container_width=True)
 
     st.subheader("Distributions", divider="gray")
     numeric_stats = {k: v for k, v in stats.items() if k != "key"}
@@ -241,7 +281,7 @@ def display_summary_stats(tracks_df: pd.DataFrame) -> None:
                     fig = px.histogram(
                         x=data["values"],
                         title=data["label"],
-                        labels={"x": desc, "y": "Count"},
+                        labels={"x": desc, "y": "Count"}
                     )
                     fig.update_layout(
                         height=150,
@@ -254,20 +294,12 @@ def display_summary_stats(tracks_df: pd.DataFrame) -> None:
                     )
                     st.plotly_chart(fig, use_container_width=True)
 
-    if "key" in stats:
-        st.subheader("Key Distribution", divider="gray")
-        key_data = pd.DataFrame.from_dict(
-            stats["key"]["values"], orient="index", columns=["count"]
-        ).sort_index()
-        fig = px.bar(
-            key_data,
-            title="Key Distribution",
-            labels={"index": "Key", "count": "Count"},
-        )
-        fig.update_layout(
-            height=200, margin=dict(l=20, r=20, t=30, b=20), showlegend=False
-        )
-        st.plotly_chart(fig, use_container_width=True)
+    # Combined Key Distribution Plot Across Algorithms for matched tracks only
+    st.subheader("Key Distribution Comparison", divider="gray")
+    # Use only the filtered (matched) tracks.
+    matched_tracks = tracks_df  # Here, tracks_df should be st.session_state.filtered_tracks
+    fig_keys = plot_three_key_distributions(matched_tracks)
+    st.plotly_chart(fig_keys, use_container_width=True)        
 
 
 def display_detailed_tracks(tracks_df: pd.DataFrame, tracks_per_page: int = 5) -> None:
