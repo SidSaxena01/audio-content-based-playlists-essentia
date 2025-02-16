@@ -10,10 +10,16 @@ dependencies = [
     "matplotlib>=3.10.0",
     "numpy<2.0",
     "pandas>=2.2.3",
+    "plotly>=6.0.0",
+    "scikit-learn>=1.6.1",
+    "scipy>=1.15.1",
     "seaborn>=0.13.2",
+    "streamlit>=1.42.0",
+    "streamlit-plotly-events>=0.0.6",
     "tensorflow-macos>=2.16.2",
     "tensorflow-metal>=1.2.0",
     "tqdm>=4.67.1",
+    "watchdog>=6.0.0",
 ]
 
 [dependency-groups]
