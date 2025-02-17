@@ -23,6 +23,7 @@
          - For analysis and filtering, values were normalized to fall between -1 and 1.
          - This normalization enables the division of the data into four distinct quadrants, simplifying the interpretation of emotional states.
          - A threshold of 0.8 voice probability was empirically determined to effectively distinguish between vocal and instrumental tracks, based on observations within my own music library.
+      - For track similarity, we also adopted a systematic approach, implementing not just n-number of similar tracks but also a similarity percentage metric to evaluate whether tracks meet a user-defined threshold.
 
 
    2. Statistics Overview:
@@ -43,18 +44,24 @@
    - **Directory Validation:** Ensures that the directories of the audio data library and analysis results with features and embeddings are validated.
    - **Pagination:** Efficiently handles large numbers of tracks, making navigation and management straightforward.
    - **Reproducibility:** Playlists are saved with metadata of all methods, descriptors, and filters applied, ensuring that results can be reproduced and verified.
+   - **Customizability:** To enhance playlist generation, we moved beyond simple playlist generation and implemented side-by-side comparison sub-tabs, enabling users to compare playlists from different models, view overlapping tracks, and export deduplicated lists as separate playlists.
+
    
 ### Overall System Observations & Opinions:
-   - The system is capable of generating insightful playlists based on the extracted features.
-   - The balance between static and interactive visualizations demonstrates a strong approach for both technical analysis and practical application in playlist generation.
-   - The app is very user-friendly with very detailed visual cues, info, warning, error, and success prompts. It is extremely customizable and adaptable.
-   - The Streamlit dashboard includes visualizations, plots, and charts, providing summaries for the entire library and filtered tracks, facilitating easy exploration.  
 
-Observations
+   - The system does a pretty good job at creating interesting playlists using the audio features we extracted.
+      - I like how we've mixed static charts with interactive ones – it's useful both for digging into the data and for actually making playlists.
+      - The app is designed to be user-friendly, with visual cues, info, warning, error, and success prompts. It is extremely customizable and adaptable.
+      - The Streamlit dashboard gives you a good overview of your whole library, and also lets you zoom in on filtered tracks.
+      - The track similarity analysis is a nice touch. Being able to set a similarity threshold and compare different models side-by-side really helps you fine-tune your playlists.
+
+### Algorithm & Models Analysis Observations
+
    - While most features are extracted reliably, occasional misclassifications (e.g., ambiguous genre splits or key data) call for further tuning of preprocessing methods.
    - Most tracks exhibited clear tempo and loudness values with distinct genre separations.
    - Bad example: Some tracks had ambiguous key detections (e.g., inconsistent key and scale values), affecting the reliability of key profiles.
    - Initially, a voice probability threshold of 0.5 was tested for vocal/instrumental classification; however, after analyzing my own music library, a threshold of 0.8 was empirically determined to be more effective, as lower probabilities resulted in numerous false positives, while the remaining false positives at 0.8 were considered outliers.
+   - For track similarity, musicnn tends to be overly permissive, often assigning high similarity scores to tracks that, perceptually, do not sound very alike; in contrast, discogs effnet appears to offer more accurate similarity assessments, aligning more closely with perceived sonic similarities and providing more reliable track suggestions.
 ---
 
 # Analysis Report
